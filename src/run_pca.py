@@ -14,11 +14,13 @@ def main():
     parser.add_argument('--ref-img', type=str,
                         help='Use the average as reference image', required=True)
     parser.add_argument('--out-pc-folder', type=str,
-                        help='Output location of principle images', required=True)
+                        help='Output location of principle images')
     parser.add_argument('--out-mean-img', type=str,
                         help='Output the mean of pca', required=True)
     parser.add_argument('--n-components', type=int,
                         help='Number of pc', required=True)
+    parser.add_argument('--save-pca-result-path', type=str,
+                        help='Save the result to the given location')
 
     args = parser.parse_args()
 
@@ -29,9 +31,15 @@ def main():
 
     pca_nii_3d = PCA_NII_3D(scan_folder_reader, args.ref_img, args.n_components)
     pca_nii_3d.run_pca()
-    mkdir_p(args.out_pc_folder)
-    pca_nii_3d.write_pc(args.out_pc_folder)
-    pca_nii_3d.write_mean(args.out_mean_img)
+
+    if args.save_pca_result_path:
+        pca_nii_3d.save_pca_obj(args.save_pca_result_path)
+
+    if args.out_pc_folder:
+        mkdir_p(args.out_pc_folder)
+        pca_nii_3d.write_pc(args.out_pc_folder)
+    if args.out_mean_img:
+        pca_nii_3d.write_mean(args.out_mean_img)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ import os
 from tools.utils import read_file_contents_list, convert_flat_2_3d
 import nibabel as nib
 import numpy as np
+import pickle
 
 
 class DataFolder:
@@ -75,3 +76,15 @@ class ScanWrapper:
         img_shape = self.get_shape()
         data_3d = convert_flat_2_3d(data_flat, img_shape)
         self.save_scan_same_space(out_path, data_3d)
+
+
+def save_object(object_to_save, file_path):
+    with open(file_path, 'wb') as output:
+        print(f'Saving obj to {file_path}', flush=True)
+        pickle.dump(object_to_save, output, pickle.HIGHEST_PROTOCOL)
+
+
+def load_object(file_path):
+    with open(file_path, 'rb') as input_file:
+        obj = pickle.load(input_file)
+        return obj
