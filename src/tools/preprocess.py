@@ -137,11 +137,12 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
     def __init__(self, config, in_folder, ref_img):
         super().__init__(config, in_folder)
         self._ref_img = ScanWrapper(ref_img)
-        self._data_matrix = self._init_data_matrix()
+        self._data_matrix = []
 
     def read_data(self):
         print(f'Reading scan from folder {self._in_data_folder.get_folder()}')
         tic = time.perf_counter()
+        self._data_matrix = self._init_data_matrix()
         self.run_non_parallel()
         # self.run_parallel()
         toc = time.perf_counter()
@@ -159,9 +160,52 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
         self._data_matrix[idx, :] = convert_3d_2_flat(in_img)
 
     def _init_data_matrix(self):
-        im_shape = self._ref_img.get_shape()
-        num_features = np.prod(im_shape)
+        num_features = self._ref_img.get_number_voxel()
         num_sample = self.num_files()
 
         data_matrix = np.zeros((num_sample, num_features))
         return data_matrix
+
+
+class ScanFolderBatchReader(AbstractParallelRoutine):
+    def __init__(self, config, in_folder, ref_img, num_batch):
+        super().__init__(config, in_folder)
+        self._ref_img = ScanWrapper(ref_img)
+        self._num_batch = num_batch
+        self._chunk_list = self._in_data_folder.get_chunks_list(num_batch)
+        self._data_matrix = []
+        self._cur_idx = 0
+
+    def read_data(self, idx_batch):
+        self._reset_cur_idx()
+
+        print(f'Reading scan from folder {self._in_data_folder.get_folder()}', flush=True)
+        tic = time.perf_counter()
+        cur_batch = self._chunk_list[idx_batch]
+        self._init_data_matrix(len(cur_batch))
+        self.run_non_parallel(cur_batch)
+        toc = time.perf_counter()
+        print(f'Done. {toc - tic:0.4f} (s)', flush=True)
+
+    def get_data_matrix(self):
+        return self._data_matrix
+
+    def _run_single_scan(self, idx):
+        in_file_path = self._in_data_folder.get_file_path(idx)
+        in_data = ScanWrapper(in_file_path)
+
+        in_img = in_data.get_data()
+        # self._data_matrix[idx, :] = in_img.reshape(in_data.get_number_voxel())
+        # self._data_matrix[idx, :] = convert_3d_2_flat(in_img)
+        self._data_matrix[self._cur_idx, :] = convert_3d_2_flat(in_img)
+        self._cur_idx += 1
+
+    def _init_data_matrix(self, num_sample):
+        num_features = self._ref_img.get_number_voxel()
+        # num_sample = self.num_files()
+
+        del self._data_matrix
+        self._data_matrix = np.zeros((num_sample, num_features))
+
+    def _reset_cur_idx(self):
+        self._cur_idx = 0

@@ -23,8 +23,9 @@ class AbstractParallelRoutine:
 
         return result_list
 
-    def run_non_parallel(self):
-        for idx in range(self.num_files()):
+    def run_non_parallel(self, idx_list=None):
+        run_idx_list = idx_list if idx_list else range(self.num_files())
+        for idx in run_idx_list:
             self._in_data_folder.print_idx(idx)
             self._run_single_scan(idx)
             print('Done', flush=True)
