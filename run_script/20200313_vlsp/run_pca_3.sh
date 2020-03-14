@@ -35,7 +35,7 @@ echo
 
 echo "#####################"
 echo "# Step.3 Run PCA"
-PCA_ROOT=${OUT_ROOT}/pca
+PCA_ROOT=${OUT_ROOT}/pca_3
 OUT_PC_FOLDER=${PCA_ROOT}/pc_20
 OUT_MEAN_IMG=${PCA_ROOT}/mean.nii.gz
 N_COMPONENTS=20

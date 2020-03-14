@@ -35,11 +35,11 @@ echo
 
 echo "#####################"
 echo "# Step.3 Run PCA"
-PCA_ROOT=${OUT_ROOT}/pca
-OUT_PC_FOLDER=${PCA_ROOT}/pc_20
+PCA_ROOT=${OUT_ROOT}/pca_2
+OUT_PC_FOLDER=${PCA_ROOT}/pc
 OUT_MEAN_IMG=${PCA_ROOT}/mean.nii.gz
 N_COMPONENTS=20
-N_BATCH=30
+N_BATCH=20
 OUT_PCA_BIN_PATH=${PCA_ROOT}/model.bin
 mkdir -p ${OUT_PC_FOLDER}
 

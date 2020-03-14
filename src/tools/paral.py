@@ -3,9 +3,9 @@ from tools.data_io import DataFolder
 
 
 class AbstractParallelRoutine:
-    def __init__(self, config, in_folder):
+    def __init__(self, config, in_folder, file_list_txt=None):
         self._config = config
-        self._in_data_folder = DataFolder.get_data_folder_obj(config, in_folder)
+        self._in_data_folder = DataFolder(in_folder, file_list_txt)
         self._num_processes = config['num_processes']
 
     def run_parallel(self):
@@ -28,7 +28,7 @@ class AbstractParallelRoutine:
         for idx in run_idx_list:
             self._in_data_folder.print_idx(idx)
             self._run_single_scan(idx)
-            print('Done', flush=True)
+            # print('Done', flush=True)
 
     def _run_single_scan(self, idx):
         raise NotImplementedError

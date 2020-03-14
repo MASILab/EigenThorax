@@ -82,6 +82,7 @@ class PCA_NII_3D_Batch(PCA_Abstract):
             data_matrix = self._scan_folder_reader.get_data_matrix()
 
             tic_batch = time.perf_counter()
+            print(f'Run pca.partial_fit. Input data shape: {data_matrix.shape}')
             pca.partial_fit(data_matrix)
             toc_batch = time.perf_counter()
             print(f'Batch done. Total time on pca: {toc_batch - tic_batch:0.4f} (s)', flush=True)

@@ -14,6 +14,7 @@ def convert_flat_2_3d(in_data_array, im_shape):
     return in_data_array.reshape(im_shape)
 
 def read_file_contents_list(file_name):
+    print(f'Reading from file list txt {file_name}', flush=True)
     with open(file_name) as file:
         lines = [line.rstrip('\n') for line in file]
         return lines

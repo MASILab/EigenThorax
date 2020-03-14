@@ -6,9 +6,13 @@ import pickle
 
 
 class DataFolder:
-    def __init__(self, in_folder, data_file_list):
+    def __init__(self, in_folder, data_file_list=None):
         self._in_folder = in_folder
-        self._file_list = self._get_file_list(data_file_list)
+        self._file_list = []
+        if data_file_list is None:
+            self._file_list = self._get_file_list_in_folder(in_folder)
+        else:
+            self._file_list = self._get_file_list(data_file_list)
 
     def get_folder(self):
         return self._in_folder
@@ -36,6 +40,9 @@ class DataFolder:
         full_id_list = range(self.num_files())
         return [full_id_list[i::num_pieces] for i in range(num_pieces)]
 
+    def get_data_file_list(self):
+        return self._file_list
+
     @staticmethod
     def _get_file_list(file_list_txt):
         return read_file_contents_list(file_list_txt)
@@ -44,6 +51,11 @@ class DataFolder:
     def get_data_folder_obj(config, in_folder):
         data_folder = DataFolder(in_folder, config['data_file_list'])
         return data_folder
+
+    @staticmethod
+    def _get_file_list_in_folder(folder_path):
+        print(f'Reading file list from folder {folder_path}', flush=True)
+        return os.listdir(folder_path)
 
 
 class ScanWrapper:
