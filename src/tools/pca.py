@@ -47,7 +47,7 @@ class PCA_Abstract:
 
 
 class PCA_NII_3D(PCA_Abstract):
-    def __init__(self, scan_folder_reader: ScanFolderFlatReader, ref_img, n_components):
+    def __init__(self, scan_folder_reader, ref_img, n_components):
         super().__init__(scan_folder_reader, ref_img)
         self._set_pca(PCA(n_components=n_components, copy=False))
 

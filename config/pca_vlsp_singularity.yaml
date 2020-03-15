@@ -1,0 +1,8 @@
+# The 10 data only used to build and test the tool.
+
+num_processes: 20
+
+src_root: /src/thorax_pca
+packages:
+  c3d: packages/c3d/c3d
+  niftyreg: packages/niftyreg/bin
