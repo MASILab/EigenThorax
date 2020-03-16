@@ -112,9 +112,9 @@ class DownSampleNiftyReg(AbstractParallelRoutine):
 
 
 class PreprocessAverageImputation(AbstractParallelRoutine):
-    def __init__(self, config, in_folder, out_folder, average_img):
-        super().__init__(config, in_folder)
-        self._out_data_folder = DataFolder.get_data_folder_obj(config, out_folder)
+    def __init__(self, config, in_folder, out_folder, average_img, file_list_txt=None):
+        super().__init__(config, in_folder, file_list_txt=file_list_txt)
+        self._out_data_folder = DataFolder.get_data_folder_obj(config, out_folder, data_list_txt=file_list_txt)
         mkdir_p(out_folder)
         self._average_img = ScanWrapper(average_img)
 
@@ -128,9 +128,6 @@ class PreprocessAverageImputation(AbstractParallelRoutine):
         np.copyto(in_img, average_img, where=(in_img != in_img))
         np.copyto(in_img, 0, where=(in_img != in_img))
         self._average_img.save_scan_same_space(out_file_path, in_img)
-
-        # np.copyto(average_img, 0, where=(average_img != average_img))
-        # self._average_img.save_scan_same_space('/nfs/masi/xuk9/SPORE/clustering/pca/2020311_10_dataset/average/union_0_imputate.nii.gz', average_img)
 
 
 class ScanFolderFlatReader(AbstractParallelRoutine):

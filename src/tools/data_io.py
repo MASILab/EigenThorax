@@ -48,8 +48,11 @@ class DataFolder:
         return read_file_contents_list(file_list_txt)
 
     @staticmethod
-    def get_data_folder_obj(config, in_folder):
-        data_folder = DataFolder(in_folder, config['data_file_list'])
+    def get_data_folder_obj(config, in_folder, data_list_txt=None):
+        in_data_list_txt = data_list_txt
+        if in_data_list_txt is None:
+            in_data_list_txt = config['data_file_list']
+        data_folder = DataFolder(in_folder, in_data_list_txt)
         return data_folder
 
     @staticmethod

@@ -6,8 +6,12 @@ import os
 
 
 class AverageScans:
-    def __init__(self, config, in_folder):
-        self._data_folder = DataFolder.get_data_folder_obj(config, in_folder)
+    def __init__(self, config, in_folder=None, data_file_txt=None, in_data_folder_obj = None):
+        self._data_folder = None
+        if in_data_folder_obj is None:
+            self._data_folder = DataFolder(in_folder, data_file_txt)
+        else:
+            self._data_folder = in_data_folder_obj
         self._standard_ref = ScanWrapper(self._data_folder.get_first_path())
         self._num_processes = config['num_processes']
 

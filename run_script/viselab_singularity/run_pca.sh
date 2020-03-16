@@ -4,7 +4,7 @@ SRC_ROOT=/src/thorax_pca
 PYTHON_ENV=/opt/conda/envs/python37/bin/python
 
 CONFIG=${SRC_ROOT}/config/pca_vlsp_singularity.yaml
-OUT_ROOT=/out
+OUT_ROOT=/data_root/clustering/pca/2020313_vlsp
 UNION_AVERAGE_IMG=${OUT_ROOT}/union_ave.nii.gz
 OUT_IMPUTE_FOLDER=${OUT_ROOT}/preprocess/imputation
 

@@ -13,6 +13,8 @@ def main():
                         help='Output location for preprocessed images', required=True)
     parser.add_argument('--average-img', type=str,
                         help='Use this average image to impute the missing voxels in targets')
+    parser.add_argument('--data-file-list', type=str,
+                        help='Data file list')
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -20,7 +22,8 @@ def main():
         config,
         args.in_folder,
         args.out_folder,
-        args.average_img
+        args.average_img,
+        file_list_txt=args.data_file_list
     )
     preprocess_obj.run_parallel()
 

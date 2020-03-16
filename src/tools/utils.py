@@ -10,14 +10,24 @@ def convert_3d_2_flat(in_data_matrix):
     num_voxel = np.prod(in_data_matrix.shape)
     return in_data_matrix.reshape(num_voxel)
 
+
 def convert_flat_2_3d(in_data_array, im_shape):
     return in_data_array.reshape(im_shape)
+
 
 def read_file_contents_list(file_name):
     print(f'Reading from file list txt {file_name}', flush=True)
     with open(file_name) as file:
         lines = [line.rstrip('\n') for line in file]
         return lines
+
+
+def write_list_to_file(file_list_data, out_path):
+    print(f'Output file list to {out_path}', flush=True)
+    with open(out_path, 'w') as file:
+        for file_name in file_list_data:
+            file.write(f'{file_name}\n')
+
 
 def get_range_paral_chunk(total_num_item, chunk_pair):
     num_item_each_chunk = int(math.ceil(float(total_num_item) / float(chunk_pair[1])))
