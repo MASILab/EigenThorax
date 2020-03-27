@@ -165,8 +165,8 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
 
 
 class ScanFolderBatchReader(AbstractParallelRoutine):
-    def __init__(self, config, in_folder, ref_img, num_batch):
-        super().__init__(config, in_folder)
+    def __init__(self, config, in_folder, ref_img, num_batch, file_list_txt=None):
+        super().__init__(config, in_folder, file_list_txt)
         self._ref_img = ScanWrapper(ref_img)
         self._num_batch = num_batch
         self._chunk_list = self._in_data_folder.get_chunks_list(num_batch)

@@ -11,6 +11,8 @@ def main():
                         help='Path to the YAML config file', required=True)
     parser.add_argument('--in-folder', type=str,
                         help='Folder of input data', required=True)
+    parser.add_argument('--in-file-list', type=str,
+                        help='file list to use in pca')
     parser.add_argument('--ref-img', type=str,
                         help='Use the average as reference image', required=True)
     parser.add_argument('--out-pc-folder', type=str,
@@ -28,8 +30,11 @@ def main():
 
     config = load_config(args.config)
 
-    scan_folder_reader = ScanFolderBatchReader(config, args.in_folder, args.ref_img, args.n_batch)
-    # scan_folder_reader.read_data()
+    scan_folder_reader = ScanFolderBatchReader(config,
+                                               args.in_folder,
+                                               args.ref_img,
+                                               args.n_batch,
+                                               file_list_txt=args.in_file_list)
 
     pca_nii_3d = PCA_NII_3D_Batch(scan_folder_reader, args.ref_img, args.n_components, args.n_batch)
     pca_nii_3d.run_pca()

@@ -62,14 +62,14 @@ class DataFolder:
 
 
 class ScanWrapper:
-    def __init__(self, ref_img_path):
-        self._ref_img = nib.load(ref_img_path)
+    def __init__(self, img_path):
+        self._img = nib.load(img_path)
 
     def get_header(self):
-        return self._ref_img.header
+        return self._img.header
 
     def get_affine(self):
-        return self._ref_img.affine
+        return self._img.affine
 
     def get_shape(self):
         return self.get_header().get_data_shape()
@@ -78,7 +78,22 @@ class ScanWrapper:
         return np.prod(self.get_shape())
 
     def get_data(self):
-        return self._ref_img.get_data()
+        return self._img.get_data()
+
+    def get_center_slices(self):
+        im_data = self.get_data()
+        im_shape = im_data.shape
+        slice_x = im_data[int(im_shape[0] / 2) - 1, :, :]
+        slice_x = np.flip(slice_x, 0)
+        slice_x = np.rot90(slice_x)
+        slice_y = im_data[:, int(im_shape[0] / 2) - 1, :]
+        slice_y = np.flip(slice_y, 0)
+        slice_y = np.rot90(slice_y)
+        slice_z = im_data[:, :, int(im_shape[2] / 2) - 1]
+        slice_z = np.rot90(slice_z)
+
+        return slice_x, slice_y, slice_z
+
 
     def save_scan_same_space(self, file_path, img_data):
         print(f'Saving image to {file_path}')
