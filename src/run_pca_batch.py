@@ -21,8 +21,8 @@ def main():
                         help='Output the mean of pca', required=True)
     parser.add_argument('--n-components', type=int,
                         help='Number of pc', required=True)
-    parser.add_argument('--n-batch', type=int,
-                        help='Number of batches')
+    parser.add_argument('--batch-size', type=int,
+                        help='Batch size')
     parser.add_argument('--save-pca-result-path', type=str,
                         help='Save the result to the given location')
 
@@ -33,10 +33,12 @@ def main():
     scan_folder_reader = ScanFolderBatchReader(config,
                                                args.in_folder,
                                                args.ref_img,
-                                               args.n_batch,
+                                               args.batch_size,
                                                file_list_txt=args.in_file_list)
 
-    pca_nii_3d = PCA_NII_3D_Batch(scan_folder_reader, args.ref_img, args.n_components, args.n_batch)
+    pca_nii_3d = PCA_NII_3D_Batch(scan_folder_reader,
+                                  args.ref_img,
+                                  args.n_components)
     pca_nii_3d.run_pca()
 
     if args.save_pca_result_path:

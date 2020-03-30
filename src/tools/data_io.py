@@ -40,6 +40,12 @@ class DataFolder:
         full_id_list = range(self.num_files())
         return [full_id_list[i::num_pieces] for i in range(num_pieces)]
 
+    def get_chunks_list_batch_size(self, batch_size):
+        num_chunks = self.num_files() // batch_size
+        chunk_list = [range(batch_size*i, batch_size*(i+1)) for i in range(num_chunks)]
+        if self.num_files() > num_chunks * batch_size:
+            chunk_list.append(range(num_chunks * batch_size, self.num_files()))
+
     def get_data_file_list(self):
         return self._file_list
 

@@ -67,10 +67,10 @@ class PCA_NII_3D(PCA_Abstract):
 
 
 class PCA_NII_3D_Batch(PCA_Abstract):
-    def __init__(self, scan_folder_reader: ScanFolderBatchReader, ref_img, n_components, n_batch):
+    def __init__(self, scan_folder_reader: ScanFolderBatchReader, ref_img, n_components):
         super().__init__(scan_folder_reader, ref_img)
         self._set_pca(IncrementalPCA(n_components=n_components, copy=False))
-        self._n_batch = n_batch
+        self._n_batch = scan_folder_reader.num_batch()
 
     def run_pca(self):
         tic_total = time.perf_counter()

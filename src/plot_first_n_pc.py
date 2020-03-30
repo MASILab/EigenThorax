@@ -34,8 +34,9 @@ def main():
 
 def _draw_10_pc_plot(slices_list, out_png, vmax, vmin):
     # plt.figure(figsize=(110, 50))
-    plt.figure(figsize=(75, 30))
-    gs1 = gridspec.GridSpec(2, 5)
+    # plt.figure(figsize=(75, 30))
+    plt.figure(figsize=(150, 20))
+    gs1 = gridspec.GridSpec(1, 10)
     gs1.update(wspace=0.025, hspace=0.05)
 
     font = {'weight': 'bold',

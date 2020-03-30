@@ -4,6 +4,8 @@ import math
 import shutil
 import nibabel as nib
 import numpy as np
+import logging
+import sys
 
 
 def convert_3d_2_flat(in_data_matrix):
@@ -262,3 +264,25 @@ def get_interpolation_command(interp_type_name, bash_config, src_root, moving_im
     command_list.append(f'{bash_script_path} {bash_config} {file_name} {real_mat_name}')
 
     return command_list
+
+
+loggers = {}
+
+
+def get_logger(name, level=logging.INFO):
+    global loggers
+    if loggers.get(name) is not None:
+        return loggers[name]
+    else:
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        # Logging to console
+        stream_handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            '%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s')
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+
+        loggers[name] = logger
+
+        return logger

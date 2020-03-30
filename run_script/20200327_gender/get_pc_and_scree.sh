@@ -49,7 +49,7 @@ get_scree_gender () {
   set +o xtrace
 }
 
-get_pc_fig_gender ${MALE_FLAG}
+#get_pc_fig_gender ${MALE_FLAG}
 get_pc_fig_gender ${FEMALE_FLAG}
 
 #get_scree_gender ${MALE_FLAG}

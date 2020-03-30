@@ -1,9 +1,12 @@
 import os
-from tools.utils import read_file_contents_list, mkdir_p, convert_3d_2_flat
+from tools.utils import read_file_contents_list, mkdir_p, convert_3d_2_flat, get_logger
 from tools.paral import AbstractParallelRoutine
 from tools.data_io import DataFolder, ScanWrapper
 import numpy as np
 import time
+
+
+logger = get_logger('Preprocess')
 
 
 class PreprocessDownSample(AbstractParallelRoutine):
@@ -130,6 +133,23 @@ class PreprocessAverageImputation(AbstractParallelRoutine):
         self._average_img.save_scan_same_space(out_file_path, in_img)
 
 
+class PreprocessClipROI(AbstractParallelRoutine):
+    def __init__(self, config, in_folder, out_folder, roi_img, file_list_txt=None):
+        super().__init__(config, in_folder, file_list_txt=file_list_txt)
+        self._out_data_folder = DataFolder.get_data_folder_obj(config, out_folder, data_list_txt=file_list_txt)
+        mkdir_p(out_folder)
+        self._roi_img_path = roi_img
+        self._reg_resample_path = config['niftyreg_resample']
+
+    def _run_single_scan(self, idx):
+        in_file_path = self._in_data_folder.get_file_path(idx)
+        out_file_path = self._out_data_folder.get_file_path(idx)
+
+        reg_resample_cmd_str = f'{self._reg_resample_path} -inter 0 -ref {self._roi_img_path} -flo {in_file_path} -res {out_file_path}'
+        logger.info(reg_resample_cmd_str)
+        os.system(reg_resample_cmd_str)
+
+
 class ScanFolderFlatReader(AbstractParallelRoutine):
     def __init__(self, config, in_folder, ref_img):
         super().__init__(config, in_folder)
@@ -165,24 +185,26 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
 
 
 class ScanFolderBatchReader(AbstractParallelRoutine):
-    def __init__(self, config, in_folder, ref_img, num_batch, file_list_txt=None):
+    def __init__(self, config, in_folder, ref_img, batch_size, file_list_txt=None):
         super().__init__(config, in_folder, file_list_txt)
         self._ref_img = ScanWrapper(ref_img)
-        self._num_batch = num_batch
-        self._chunk_list = self._in_data_folder.get_chunks_list(num_batch)
+        self._chunk_list = self._in_data_folder.get_chunks_list_batch_size(batch_size)
         self._data_matrix = []
         self._cur_idx = 0
 
     def read_data(self, idx_batch):
         self._reset_cur_idx()
 
-        print(f'Reading scan from folder {self._in_data_folder.get_folder()}', flush=True)
+        print(f'Reading scans from folder {self._in_data_folder.get_folder()}', flush=True)
         tic = time.perf_counter()
         cur_batch = self._chunk_list[idx_batch]
         self._init_data_matrix(len(cur_batch))
         self.run_non_parallel(cur_batch)
         toc = time.perf_counter()
         print(f'Done. {toc - tic:0.4f} (s)', flush=True)
+
+    def num_batch(self):
+        return len(self._chunk_list)
 
     def get_data_matrix(self):
         return self._data_matrix
