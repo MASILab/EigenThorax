@@ -25,6 +25,7 @@ void parseCommandLine(parameters& args,int argc, char * const argv[]){
     argin.insert(val('A',9));
     argin.insert(val('R',10));
     argin.insert(val('D',11));
+    argin.insert(val('J',12));
 
     // parsing the input
     int requiredArgs=0;
@@ -34,6 +35,7 @@ void parseCommandLine(parameters& args,int argc, char * const argv[]){
     char* movsegfile=new char[PATH_MAX];
     char* affinefile=new char[PATH_MAX];
     char* deformedfile=new char[PATH_MAX];
+    char* jacobianfile=new char[PATH_MAX];
 
     float alpha=1.6;
     int maxlevel=args.levels;
@@ -107,7 +109,10 @@ void parseCommandLine(parameters& args,int argc, char * const argv[]){
                         sprintf(deformedfile,"%s",argv[k+1]);
                         requiredArgs++;
                         break;
-
+                    case 12:
+                        sprintf(jacobianfile,"%s",argv[k+1]);
+                        requiredArgs++;
+                        break;
                     default:
                         cout<<"Invalid option: "<<argv[k]<<" use -h for help\n";
                         break;
@@ -151,6 +156,9 @@ void parseCommandLine(parameters& args,int argc, char * const argv[]){
     realpathEx(deformedfile,correctfile);
     string s6(correctfile);
     args.deformed_file=s6;
+    realpathEx(jacobianfile,correctfile);
+    string s7(correctfile);
+    args.jacobian_file=s7;
 
 
     args.alpha=alpha;

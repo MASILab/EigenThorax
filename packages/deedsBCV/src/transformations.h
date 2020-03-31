@@ -1,6 +1,7 @@
 /* several functions to interpolate and symmetrise deformations
  calculates Jacobian and harmonic Energy */
 
+#include<cmath>
 
 void interp3(float* interp,float* input,float* x1,float* y1,float* z1,int m,int n,int o,int m2,int n2,int o2,bool flag){
 	for(int k=0;k<o;k++){
@@ -79,7 +80,137 @@ void volfilter(float* imagein,int m,int n,int o,int length,float sigma){
 	
 }
 
+double eps = 10e-5;
 
+void jacobian_determinant_log(float* J_det, float* u1,float* v1,float* w1,int m,int n,int o)
+{
+	int i;
+	float grad[3]={-0.5,0.0,0.5};
+//    float* Jac=new float[m*n*o];
+
+	float* J11=new float[m*n*o];
+	float* J12=new float[m*n*o];
+	float* J13=new float[m*n*o];
+	float* J21=new float[m*n*o];
+	float* J22=new float[m*n*o];
+	float* J23=new float[m*n*o];
+	float* J31=new float[m*n*o];
+	float* J32=new float[m*n*o];
+	float* J33=new float[m*n*o];
+
+	for(i=0;i<(m*n*o);i++){
+		J11[i]=0.0;
+		J12[i]=0.0;
+		J13[i]=0.0;
+		J21[i]=0.0;
+		J22[i]=0.0;
+		J23[i]=0.0;
+		J31[i]=0.0;
+		J32[i]=0.0;
+		J33[i]=0.0;
+	}
+
+	float neg=0; float Jmin=1; float Jmax=1; float J;
+	float count=0; float frac;
+
+	filter1(u1,J11,m,n,o,grad,3,2);
+	filter1(u1,J12,m,n,o,grad,3,1);
+	filter1(u1,J13,m,n,o,grad,3,3);
+
+	filter1(v1,J21,m,n,o,grad,3,2);
+	filter1(v1,J22,m,n,o,grad,3,1);
+	filter1(v1,J23,m,n,o,grad,3,3);
+
+	filter1(w1,J31,m,n,o,grad,3,2);
+	filter1(w1,J32,m,n,o,grad,3,1);
+	filter1(w1,J33,m,n,o,grad,3,3);
+
+	for(i=0;i<(m*n*o);i++){
+		J11[i]+=1.0;
+		J22[i]+=1.0;
+		J33[i]+=1.0;
+	}
+	for(i=0;i<(m*n*o);i++){
+		J=J11[i]*(J22[i]*J33[i]-J23[i]*J32[i])-J21[i]*(J12[i]*J33[i]-J13[i]*J32[i])+J31[i]*(J12[i]*J23[i]-J13[i]*J22[i]);
+		if (J <= 0)
+			J = eps;
+		J_det[i]=std::log(J);
+	}
+
+	delete []J11;
+	delete []J12;
+	delete []J13;
+	delete []J21;
+	delete []J22;
+	delete []J23;
+	delete []J31;
+	delete []J32;
+	delete []J33;
+}
+
+void jacobian_determinant(float* J_det, float* u1,float* v1,float* w1,int m,int n,int o)
+{
+	int i;
+	float grad[3]={-0.5,0.0,0.5};
+//    float* Jac=new float[m*n*o];
+
+	float* J11=new float[m*n*o];
+	float* J12=new float[m*n*o];
+	float* J13=new float[m*n*o];
+	float* J21=new float[m*n*o];
+	float* J22=new float[m*n*o];
+	float* J23=new float[m*n*o];
+	float* J31=new float[m*n*o];
+	float* J32=new float[m*n*o];
+	float* J33=new float[m*n*o];
+
+	for(i=0;i<(m*n*o);i++){
+		J11[i]=0.0;
+		J12[i]=0.0;
+		J13[i]=0.0;
+		J21[i]=0.0;
+		J22[i]=0.0;
+		J23[i]=0.0;
+		J31[i]=0.0;
+		J32[i]=0.0;
+		J33[i]=0.0;
+	}
+
+	float neg=0; float Jmin=1; float Jmax=1; float J;
+	float count=0; float frac;
+
+	filter1(u1,J11,m,n,o,grad,3,2);
+	filter1(u1,J12,m,n,o,grad,3,1);
+	filter1(u1,J13,m,n,o,grad,3,3);
+
+	filter1(v1,J21,m,n,o,grad,3,2);
+	filter1(v1,J22,m,n,o,grad,3,1);
+	filter1(v1,J23,m,n,o,grad,3,3);
+
+	filter1(w1,J31,m,n,o,grad,3,2);
+	filter1(w1,J32,m,n,o,grad,3,1);
+	filter1(w1,J33,m,n,o,grad,3,3);
+
+	for(i=0;i<(m*n*o);i++){
+		J11[i]+=1.0;
+		J22[i]+=1.0;
+		J33[i]+=1.0;
+	}
+	for(i=0;i<(m*n*o);i++){
+		J=J11[i]*(J22[i]*J33[i]-J23[i]*J32[i])-J21[i]*(J12[i]*J33[i]-J13[i]*J32[i])+J31[i]*(J12[i]*J23[i]-J13[i]*J22[i]);
+		J_det[i]=J;
+	}
+
+	delete []J11;
+	delete []J12;
+	delete []J13;
+	delete []J21;
+	delete []J22;
+	delete []J23;
+	delete []J31;
+	delete []J32;
+	delete []J33;
+}
 
 float jacobian(float* u1,float* v1,float* w1,int m,int n,int o,int factor){
 	
