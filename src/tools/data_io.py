@@ -45,6 +45,7 @@ class DataFolder:
         chunk_list = [range(batch_size*i, batch_size*(i+1)) for i in range(num_chunks)]
         if self.num_files() > num_chunks * batch_size:
             chunk_list.append(range(num_chunks * batch_size, self.num_files()))
+        return chunk_list
 
     def get_data_file_list(self):
         return self._file_list
