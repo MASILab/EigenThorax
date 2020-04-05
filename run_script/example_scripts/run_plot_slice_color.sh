@@ -15,16 +15,16 @@ mkdir -p ${PNG_OUTPUT_FOLDER}
 
 IN_IMG_FOLDER=jacobian_trim_aff_correct_analyze
 #IN_IMG_FOLDER=jacobian_trim_analyze
-#IN_IMG_NAME=average.nii.gz
-IN_IMG_NAME=variance.nii.gz
+IN_IMG_NAME=average.nii.gz
+#IN_IMG_NAME=variance.nii.gz
 IN_IMG=${PROJ_ROOT}/${IN_IMG_FOLDER}/${IN_IMG_NAME}
 OUT_PNG=${PNG_OUTPUT_FOLDER}/${IN_IMG_FOLDER}_${IN_IMG_NAME}.png
 
-VMAX="3"
-VMIN="-4"
+#VMAX="3"
+#VMIN="-4"
 
-#VMAX="1"
-#VMIN="-3"
+VMAX="1"
+VMIN="-3"
 
 set -o xtrace
 

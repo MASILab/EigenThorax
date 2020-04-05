@@ -13,6 +13,7 @@ class DataFolder:
             self._file_list = self._get_file_list_in_folder(in_folder)
         else:
             self._file_list = self._get_file_list(data_file_list)
+        self._suffix = '.nii.gz'
 
     def get_folder(self):
         return self._in_folder
@@ -52,6 +53,11 @@ class DataFolder:
 
     def set_file_list(self, file_list):
         self._file_list = file_list
+
+    def change_suffix(self, new_suffix):
+        new_file_list = [file_name.replace(self._suffix, new_suffix) for file_name in self._file_list]
+        self._file_list = new_file_list
+        self._suffix = new_suffix
 
     @staticmethod
     def _get_file_list(file_list_txt):
