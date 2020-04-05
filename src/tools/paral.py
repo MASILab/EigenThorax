@@ -19,7 +19,7 @@ class AbstractParallelRoutine:
             result_obj = result_obj_list[thread_idx]
             result_obj.wait()
             print(f'Thread with idx {thread_idx} / {len(result_obj_list)} is completed', flush=True)
-            result_list.append(result_obj.get())
+            result_list = result_list + result_obj.get()
 
         return result_list
 
@@ -34,9 +34,12 @@ class AbstractParallelRoutine:
         raise NotImplementedError
 
     def _run_chunk(self, chunk_list):
+        result_list = []
         for idx in chunk_list:
             self._in_data_folder.print_idx(idx)
-            self._run_single_scan(idx)
+            result = self._run_single_scan(idx)
+            result_list.append(result)
+        return result_list
 
     def num_files(self):
         return self._in_data_folder.num_files()

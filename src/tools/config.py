@@ -8,8 +8,11 @@ def load_config(config_path):
     src_root = config['src_root']
     package_config = config['packages']
     config['c3d_exe'] = os.path.join(src_root, package_config['c3d'])
-    config['niftyreg'] = os.path.join(src_root, package_config['niftyreg'])
-    config['niftyreg_resample'] = os.path.join(config['niftyreg'], 'reg_resample')
+    niftyreg_path = os.path.join(src_root, package_config['niftyreg'])
+    config['niftyreg_resample'] = os.path.join(niftyreg_path, 'reg_resample')
+    config['niftyreg_reg_measure'] = os.path.join(niftyreg_path, 'reg_measure')
+    deedsBCV_path = os.path.join(src_root, package_config['deedsBCV'])
+    config['deedsBCV_jacobian'] = os.path.join(deedsBCV_path, 'getJacobian')
 
     return config
 

@@ -1,0 +1,8 @@
+num_processes: 20
+
+src_root: /nfs/masi/xuk9/singularity/thorax_combine/conda_base/src/thorax_pca
+packages:
+  c3d: packages/c3d/c3d
+  niftyreg: packages/niftyreg/bin
+  deedsBCV: packages/deedsBCV
+

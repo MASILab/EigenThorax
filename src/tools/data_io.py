@@ -49,6 +49,9 @@ class DataFolder:
     def get_data_file_list(self):
         return self._file_list
 
+    def set_file_list(self, file_list):
+        self._file_list = file_list
+
     @staticmethod
     def _get_file_list(file_list_txt):
         return read_file_contents_list(file_list_txt)
@@ -56,9 +59,15 @@ class DataFolder:
     @staticmethod
     def get_data_folder_obj(config, in_folder, data_list_txt=None):
         in_data_list_txt = data_list_txt
-        if in_data_list_txt is None:
-            in_data_list_txt = config['data_file_list']
+        # if in_data_list_txt is None:
+        #     # in_data_list_txt = config['data_file_list']
         data_folder = DataFolder(in_folder, in_data_list_txt)
+        return data_folder
+
+    @staticmethod
+    def get_data_folder_obj_with_list(in_folder, data_list):
+        data_folder = DataFolder(in_folder)
+        data_folder.set_file_list(data_list)
         return data_folder
 
     @staticmethod
@@ -70,6 +79,10 @@ class DataFolder:
 class ScanWrapper:
     def __init__(self, img_path):
         self._img = nib.load(img_path)
+        self._path = img_path
+
+    def get_path(self):
+        return self._path
 
     def get_header(self):
         return self._img.header
