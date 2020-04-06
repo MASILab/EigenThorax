@@ -5,9 +5,6 @@ from tools.data_io import DataFolder, ScanWrapper
 import numpy as np
 import time
 
-from tools.apply_mask import apply_mask
-
-
 logger = get_logger('Preprocess')
 
 
@@ -271,5 +268,56 @@ class JacobianAffineCorrection(AbstractParallelRoutine):
 
     def _get_affine_matrix(self, mat_path):
         return np.loadtxt(mat_path)
+
+
+class NonNanRegion(AbstractParallelRoutine):
+    def __init__(self, config, in_folder, out_folder, file_list_txt):
+        super().__init__(config, in_folder, file_list_txt)
+        self._out_folder = DataFolder.get_data_folder_obj(config, out_folder, data_list_txt=file_list_txt)
+
+    def _run_single_scan(self, idx):
+        in_img = ScanWrapper(self._in_data_folder.get_file_path(idx))
+        out_mask_path = self._out_folder.get_file_path(idx)
+
+        in_img_data = in_img.get_data()
+        non_nan_mask = in_img_data == in_img_data
+
+        logger.info(f'Save non-nan mask to {out_mask_path}')
+        in_img.save_scan_same_space(out_mask_path, non_nan_mask.astype(int))
+
+
+class MaskIntersection(AbstractParallelRoutine):
+    def __init__(self, config, in_folder, out_img_path, file_list_txt):
+        super().__init__(config, in_folder, file_list_txt)
+        self._out_img_path = out_img_path
+        self._ref_img = ScanWrapper(self._in_data_folder.get_first_path())
+
+    def run(self):
+        result_list = self.run_parallel()
+        out_mask = self._get_intersect_mask(result_list)
+
+        self._ref_img.save_scan_same_space(self._out_img_path, out_mask)
+
+    def _run_single_scan(self, idx):
+        in_img = ScanWrapper(self._in_data_folder.get_file_path(idx))
+        return in_img.get_data()
+
+    def _run_chunk(self, chunk_list):
+        result_list = []
+        inter_mask = np.ones(self._ref_img.get_shape())
+        for idx in chunk_list:
+            self._in_data_folder.print_idx(idx)
+            mask = self._run_single_scan(idx)
+            inter_mask = np.multiply(inter_mask, mask)
+
+        result_list.append(inter_mask)
+        return result_list
+
+    def _get_intersect_mask(self, mask_list):
+        inter_mask = np.ones(self._ref_img.get_shape())
+        for mask in mask_list:
+            inter_mask = np.multiply(inter_mask, mask)
+
+        return inter_mask
 
 

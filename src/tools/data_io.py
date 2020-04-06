@@ -1,8 +1,10 @@
 import os
-from tools.utils import read_file_contents_list, convert_flat_2_3d
+from tools.utils import read_file_contents_list, convert_flat_2_3d, get_logger
 import nibabel as nib
 import numpy as np
 import pickle
+
+logger = get_logger('DataFolder')
 
 
 class DataFolder:
@@ -35,7 +37,7 @@ class DataFolder:
         return len(self._file_list)
 
     def print_idx(self, idx):
-        print('Process %s (%d/%d)' % (self.get_file_path(idx), idx, self.num_files()), flush=True)
+        logger.info('Process %s (%d/%d)' % (self.get_file_path(idx), idx, self.num_files()))
 
     def get_chunks_list(self, num_pieces):
         full_id_list = range(self.num_files())

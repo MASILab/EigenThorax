@@ -1,6 +1,10 @@
 from multiprocessing import Pool
 from tools.data_io import DataFolder
 
+from tools.utils import get_logger
+
+logger = get_logger('Parallel')
+
 
 class AbstractParallelRoutine:
     def __init__(self, config, in_folder, file_list_txt=None):
@@ -18,7 +22,7 @@ class AbstractParallelRoutine:
         for thread_idx in range(len(result_obj_list)):
             result_obj = result_obj_list[thread_idx]
             result_obj.wait()
-            print(f'Thread with idx {thread_idx} / {len(result_obj_list)} is completed', flush=True)
+            logger.info(f'Thread with idx {thread_idx} / {len(result_obj_list)} is completed')
             result_list = result_list + result_obj.get()
 
         return result_list
