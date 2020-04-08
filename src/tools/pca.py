@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA, IncrementalPCA
 import time
 from tools.data_io import save_object, load_object
 from tools.preprocess import ScanFolderFlatReader, ScanFolderBatchReader
+from tools.paral import AbstractParallelRoutine
 
 
 class PCA_Abstract:
@@ -89,5 +90,10 @@ class PCA_NII_3D_Batch(PCA_Abstract):
         toc_total = time.perf_counter()
         print(f'Incremental PCA done. Total time: {toc_total - tic_total:0.4f} (s)')
 
+
+class Analyze_PCA_Space(AbstractParallelRoutine):
+    def __init__(self, config, pca: PCA_NII_3D_Batch, in_scan_folder: str, file_list_txt: str):
+        super().__init__(config, in_scan_folder, file_list_txt)
+        self._pca = pca
 
 

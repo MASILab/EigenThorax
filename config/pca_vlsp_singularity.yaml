@@ -3,6 +3,8 @@
 num_processes: 60
 
 src_root: /src/thorax_pca
+
 packages:
   c3d: packages/c3d/c3d
   niftyreg: packages/niftyreg/bin
+  deedsBCV: packages/deedsBCV
