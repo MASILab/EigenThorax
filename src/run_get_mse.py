@@ -1,6 +1,6 @@
 import argparse
 from tools.config import load_config
-from tools.preprocess import CalculateMSE
+from tools.loss import CalculateMSE
 
 
 def main():

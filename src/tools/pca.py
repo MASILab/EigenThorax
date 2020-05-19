@@ -4,6 +4,8 @@ import time
 from tools.data_io import save_object, load_object
 from tools.preprocess import ScanFolderFlatReader, ScanFolderBatchReader
 from tools.paral import AbstractParallelRoutine
+from tools.utils import convert_3d_2_flat
+import numpy as np
 
 
 class PCA_Abstract:
@@ -42,6 +44,11 @@ class PCA_Abstract:
 
     def save_pca_obj(self, file_path):
         save_object(self._pca, file_path)
+
+    def transform(self, image_obj):
+        image_flat = convert_3d_2_flat(image_obj.get_data())
+        image_flat = np.reshape(image_flat, (1, len(image_flat)))   
+        return self._pca.transform(image_flat)[0]
 
     def run_pca(self):
         raise NotImplementedError
@@ -91,9 +98,5 @@ class PCA_NII_3D_Batch(PCA_Abstract):
         print(f'Incremental PCA done. Total time: {toc_total - tic_total:0.4f} (s)')
 
 
-class Analyze_PCA_Space(AbstractParallelRoutine):
-    def __init__(self, config, pca: PCA_NII_3D_Batch, in_scan_folder: str, file_list_txt: str):
-        super().__init__(config, in_scan_folder, file_list_txt)
-        self._pca = pca
 
 

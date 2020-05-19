@@ -29,11 +29,11 @@ ${PYTHON_ENV} ${SRC_ROOT}/src/run_get_mse.py \
   --out-csv ${MSE_CSV} \
   --data-file-list ${DATA_LIST}
 
-${PYTHON_ENV} ${SRC_ROOT}/src/run_get_mse.py \
-  --config ${CONFIG} \
-  --in-folder ${JACOBIAN_TRIM_AFFINE_CORRECT_FOLDER} \
-  --ref-img ${JACOBIAN_TRIM_AFFINE_CORRECT_AVERAGE} \
-  --out-csv ${MSE_W_AFFINE_CORC_CSV} \
-  --data-file-list ${DATA_LIST}
+#${PYTHON_ENV} ${SRC_ROOT}/src/run_get_mse.py \
+#  --config ${CONFIG} \
+#  --in-folder ${JACOBIAN_TRIM_AFFINE_CORRECT_FOLDER} \
+#  --ref-img ${JACOBIAN_TRIM_AFFINE_CORRECT_AVERAGE} \
+#  --out-csv ${MSE_W_AFFINE_CORC_CSV} \
+#  --data-file-list ${DATA_LIST}
 
 set +o xtrace
