@@ -1,5 +1,10 @@
 import pandas as pd
 import re
+from datetime import datetime
+from tools.utils import get_logger
+import numpy as np
+
+logger = get_logger('Clinical')
 
 
 class ClinicalDataReaderSPORE:
@@ -31,6 +36,46 @@ class ClinicalDataReaderSPORE:
             if_match = sex_str == field_flag
 
         return if_match
+
+    def check_if_have_record(self, file_name_nii_gz):
+        spore_name_field = self._get_name_field_flat_from_sub_id(
+            self._get_subject_id_from_file_name(file_name_nii_gz)
+        )
+        spore_date_field = self._get_date_str_from_file_name(file_name_nii_gz)
+        filtered_rows = \
+            self._df[(self._df['SPORE'] == spore_name_field) & (self._df['studydate'] == np.datetime64(spore_date_field))]
+
+        count_row = filtered_rows.shape[0]
+
+        return count_row != 0
+
+    def get_value_field(self, file_name_nii_gz, field_flag):
+        spore_name_field = self._get_name_field_flat_from_sub_id(
+            self._get_subject_id_from_file_name(file_name_nii_gz)
+        )
+        spore_date_field = self._get_date_str_from_file_name(file_name_nii_gz)
+
+        filtered_rows = \
+            self._df[(self._df['SPORE'] == spore_name_field) & (self._df['studydate'] == np.datetime64(spore_date_field))]
+
+        return_val = np.nan
+        count_row = filtered_rows.shape[0]
+        if count_row == 0:
+            logger.info(f'Cannot find label item for {file_name_nii_gz}')
+        else:
+            return_val = filtered_rows.iloc[0][field_flag]
+            # logger.info(f'Field value: {return_val}')
+
+        return return_val
+
+
+    @staticmethod
+    def _get_date_str_from_file_name(file_name_nii_gz):
+        match_list = re.match(r"(?P<subject_id>\d+)time(?P<time_id>\d+).nii.gz", file_name_nii_gz)
+        date_str_ori = match_list.group('time_id')
+        date_obj = datetime.strptime(date_str_ori, "%Y%m%d")
+        # date_str = date_obj.strftime("%m/%d/%Y")
+        return date_obj
 
     @staticmethod
     def _get_subject_id_from_file_name(file_name_nii_gz):
