@@ -30,9 +30,8 @@ class PCA_Abstract:
         n_components = self._pca.n_components
         pc = self._pca.components_
         for idx_pc in range(n_components):
-            out_path = f'{out_folder}/pc_{idx_pc}.nii.gz'
             pc_data_flat = pc[idx_pc, :]
-            self._ref_img.save_scan_flat_img(pc_data_flat, out_path)
+            self._scan_folder_reader.save_flat_data(pc_data_flat, idx_pc, out_folder)
 
     def write_mean(self, out_path):
         print('Save mean', flush=True)
@@ -49,6 +48,16 @@ class PCA_Abstract:
         image_flat = convert_3d_2_flat(image_obj.get_data())
         image_flat = np.reshape(image_flat, (1, len(image_flat)))   
         return self._pca.transform(image_flat)[0]
+
+    def transform_concat(self, image_obj, jac_obj):
+        image_flat = convert_3d_2_flat(image_obj.get_data())
+        jac_flat = convert_3d_2_flat(jac_obj.get_data())
+
+        feature_1d = np.zeros((1, len(image_flat) + len(jac_flat)))
+        feature_1d[0, :len(image_flat)] = image_flat[:]
+        feature_1d[0, len(image_flat):] = jac_flat[:]
+
+        return self._pca.transform(feature_1d)[0]
 
     def run_pca(self):
         raise NotImplementedError
@@ -75,7 +84,7 @@ class PCA_NII_3D(PCA_Abstract):
 
 
 class PCA_NII_3D_Batch(PCA_Abstract):
-    def __init__(self, scan_folder_reader: ScanFolderBatchReader, ref_img, n_components):
+    def __init__(self, scan_folder_reader, ref_img, n_components):
         super().__init__(scan_folder_reader, ref_img)
         self._set_pca(IncrementalPCA(n_components=n_components, copy=False))
         self._n_batch = scan_folder_reader.num_batch()

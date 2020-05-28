@@ -49,6 +49,32 @@ class ClinicalDataReaderSPORE:
 
         return count_row != 0
 
+    def check_nearest_record_for_impute(self, file_name_nii_gz):
+        cp_record_file_name = None
+
+        spore_name_field = self._get_name_field_flat_from_sub_id(
+            self._get_subject_id_from_file_name(file_name_nii_gz)
+        )
+        spore_date_field = self._get_date_str_from_file_name(file_name_nii_gz)
+        spore_date_field = np.datetime64(spore_date_field)
+        filtered_rows_name_field = \
+            self._df[(self._df['SPORE'] == spore_name_field)]
+
+        if filtered_rows_name_field.shape[0] > 0:
+            time_list = filtered_rows_name_field['studydate'].to_numpy()
+            time_delta_list = time_list - spore_date_field
+            time_days_list = time_delta_list / np.timedelta64(1, 'D')
+            time_days_list = np.abs(time_days_list)
+            min_idx = np.argmin(time_days_list)
+
+            subj_id = self._get_subject_id_from_file_name(file_name_nii_gz)
+            time_closest = time_list[min_idx]
+            datetime_obj = pd.to_datetime(str(time_closest))
+            datetime_str = datetime_obj.strftime('%Y%m%d')
+            cp_record_file_name = f'{subj_id:08}time{datetime_str}.nii.gz'
+
+        return cp_record_file_name
+
     def get_value_field(self, file_name_nii_gz, field_flag):
         spore_name_field = self._get_name_field_flat_from_sub_id(
             self._get_subject_id_from_file_name(file_name_nii_gz)

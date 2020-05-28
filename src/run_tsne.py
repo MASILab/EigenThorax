@@ -26,8 +26,10 @@ def main():
 
     logger.info('Start tSNE')
     # embedded_matrix = TSNE(perplexity=50, learning_rate=10000, n_components=args.dim_embedded).fit_transform(data_matrix)
-    embedded_matrix = TSNE(perplexity=50, learning_rate=100000, n_components=args.dim_embedded).fit_transform(
+    embedded_matrix = TSNE(perplexity=50, n_iter=100000, n_components=args.dim_embedded).fit_transform(
         data_matrix)
+    # embedded_matrix = TSNE(perplexity=50, learning_rate=10000, n_components=args.dim_embedded).fit_transform(
+    #     data_matrix)
     logger.info('Complete')
     logger.info(f'Output shape: {embedded_matrix.shape}')
 
