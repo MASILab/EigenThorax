@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_mutual_info_score
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.manifold import TSNE
+from sklearn.manifold import LocallyLinearEmbedding
 
 
 logger = get_logger('KMeans')
@@ -21,6 +24,7 @@ class KMeansClusterAnalyzer:
         self._kmean_n_cluster_range = range(3, 9)
         self._bar_w = 0.12
         self._n_init = 1000
+        self._con_factor = 0.7
 
     def plot_kmean_n_cluster_field_list_exclude_cancer_in_1_year(self, field_list, n_cluster, out_png_folder):
         df_field = self._label_df[self._label_df['CancerIncubation'] != 0]
@@ -31,6 +35,11 @@ class KMeansClusterAnalyzer:
         logger.info(f'Run k-means')
         k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init).fit(data_X)
         pred_labels = k_mean.labels_
+
+        self._plot_2D_embedding_LDA(data_X, pred_labels, out_png_folder)
+        self._plot_2D_embedding_tsne(data_X, pred_labels, out_png_folder)
+        self._plot_2D_embedding_lle(data_X, pred_labels, out_png_folder)
+        self._plot_2D_embedding_con_TSNE(data_X, pred_labels, out_png_folder)
 
         cluster_size = []
         for idx_cluster in range(n_cluster):
@@ -81,6 +90,89 @@ class KMeansClusterAnalyzer:
         out_png_path = os.path.join(out_png_folder, f'exclude_cancer_in_1_year.png')
         logger.info(f'Save to {out_png_path}')
         plt.savefig(out_png_path)
+        plt.close()
+
+    def _contract_cluster_data_to_center(self, data_X, pred_label, contract_ratio):
+        updated_data_X = np.zeros(data_X.shape, dtype=float)
+        num_cluster = np.max(pred_label) + 1
+        for idx_cluster in range(num_cluster):
+            cluster_idx_list = np.where(pred_label == idx_cluster)
+            data_cluster = data_X[cluster_idx_list]
+            cluster_centroid = np.average(data_cluster, axis=0)
+            contracted_cluster_data = \
+                contract_ratio * (data_cluster - cluster_centroid) + cluster_centroid
+            updated_data_X[cluster_idx_list] = contracted_cluster_data
+
+        return updated_data_X
+
+    def _2D_embed(self, data_X, pred_label, method, contract_factor=0.7):
+        data_embedded = None
+        if method == 'LDA':
+            lda_obj = LinearDiscriminantAnalysis(n_components=2)
+            lda_obj.fit(data_X, pred_label)
+            data_embedded = lda_obj.transform(data_X)
+        elif method == 'TSNE':
+            data_embedded = TSNE(n_components=2).fit_transform(data_X)
+        elif method == 'LLE':
+            data_embedded = LocallyLinearEmbedding(n_components=2).fit_transform(data_X)
+        elif method == 'con_TSNE':
+            data_X = self._contract_cluster_data_to_center(data_X, pred_label, contract_factor)
+            data_embedded = TSNE(n_components=2).fit_transform(data_X)
+
+        return data_embedded
+
+    def _plot_2D_embedded_data(self, data_embedded, pred_label, title, out_png_path):
+        fig, ax = plt.subplots(figsize=(20, 14))
+        num_cluster = np.max(pred_label) + 1
+        for idx_cluster in range(num_cluster):
+            cluster_idx_list = np.where(pred_label == idx_cluster)
+            data_embedded_cluster = data_embedded[cluster_idx_list]
+            cluster_size = len(cluster_idx_list[0])
+            ax.scatter(
+                data_embedded_cluster[:, 0],
+                data_embedded_cluster[:, 1],
+                alpha=0.9,
+                label=f'Cluster {idx_cluster + 1} (size {cluster_size})'
+            )
+        plt.title(title)
+        logger.info(f'Save to {out_png_path}')
+        plt.legend(loc='best')
+        plt.savefig(out_png_path)
+        plt.close()
+
+    def _plot_2D_embedding_LDA(self, data_X, pred_label, out_png_folder):
+        data_embedded = self._2D_embed(data_X, pred_label, 'LDA')
+        title = 'KMean clustering, 2D embedding with LDA'
+        out_png_path = os.path.join(out_png_folder, '2d_embed_LDA.png')
+        self._plot_2D_embedded_data(data_embedded, pred_label, title, out_png_path)
+
+    def _plot_2D_embedding_tsne(self, data_X, pred_label, out_png_folder):
+        data_embedded = self._2D_embed(data_X, pred_label, 'TSNE')
+        title = 'KMean clustering, 2D embedding with t-SNE'
+        out_png_path = os.path.join(out_png_folder, '2d_embed_tSNE.png')
+        self._plot_2D_embedded_data(data_embedded, pred_label, title, out_png_path)
+
+    def _plot_2D_embedding_lle(self, data_X, pred_label, out_png_folder):
+        data_embedded = self._2D_embed(data_X, pred_label, 'LLE')
+        title = 'KMean clustering, 2D embedding with LLE'
+        out_png_path = os.path.join(out_png_folder, '2d_embed_LLE.png')
+        self._plot_2D_embedded_data(data_embedded, pred_label, title, out_png_path)
+
+    def _plot_2D_embedding_con_TSNE_series(self, data_X, pred_label, out_png_folder):
+        factor_idx = 0
+        for con_factor in np.arange(0.5, 1.0, 0.05):
+            data_embedded = self._2D_embed(data_X, pred_label, f'con_TSNE', con_factor)
+            title = f'KMean clustering, 2D embedding with con_TSNE, contract factor {con_factor}'
+            out_png_path = os.path.join(out_png_folder, f'2d_embed_con_TSNE_{factor_idx}.png')
+            self._plot_2D_embedded_data(data_embedded, pred_label, title, out_png_path)
+            factor_idx += 1
+
+    def _plot_2D_embedding_con_TSNE(self, data_X, pred_label, out_png_folder):
+        con_factor = 0.7
+        data_embedded = self._2D_embed(data_X, pred_label, f'con_TSNE', con_factor)
+        title = f'KMean clustering, 2D embedding with t-SNE'
+        out_png_path = os.path.join(out_png_folder, f'2d_embed_con_TSNE.png')
+        self._plot_2D_embedded_data(data_embedded, pred_label, title, out_png_path)
 
     def plot_cancer_incubation_distribute(self, out_png_folder):
         # TODO
@@ -329,9 +421,9 @@ def main():
     # kmean_analyzer.plot_kmean_series('Packyear', args.out_png_folder)
     # kmean_analyzer.plot_kmean_series('CancerIncubation', args.out_png_folder)
 
-    kmean_analyzer.plot_kmean_n_cluster_field_list_exclude_cancer_in_1_year(
-        ['CancerIncubation', 'COPD', 'Coronary Artery Calcification', 'Age', 'Packyear', 'bmi'],
-        9, args.out_png_folder)
+    # kmean_analyzer.plot_kmean_n_cluster_field_list_exclude_cancer_in_1_year(
+    #     ['CancerIncubation', 'COPD', 'Coronary Artery Calcification', 'Age', 'Packyear', 'bmi'],
+    #     9, args.out_png_folder)
 
 
 if __name__ == '__main__':
