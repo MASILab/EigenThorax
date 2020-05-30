@@ -94,7 +94,6 @@ class ClinicalDataReaderSPORE:
 
         return return_val
 
-
     @staticmethod
     def _get_date_str_from_file_name(file_name_nii_gz):
         match_list = re.match(r"(?P<subject_id>\d+)time(?P<time_id>\d+).nii.gz", file_name_nii_gz)

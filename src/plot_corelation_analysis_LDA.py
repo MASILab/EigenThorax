@@ -13,6 +13,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn import metrics
 from sklearn.model_selection import KFold
 import matplotlib.gridspec as gridspec
+import matplotlib.mlab as mlab
+import datetime
 
 
 logger = get_logger('LDA')
@@ -183,6 +185,7 @@ class PlotCorrAnalyzeLDA:
         # estimate_prob = np.zeros((n_sample,), dtype=float)
         estimate_prob_list = []
         data_Y_list = []
+        projected_list = []
         n_fold = KFold(n_splits=5)
 
         # data_Y = np.array(data_Y, dtype=int)
@@ -202,10 +205,6 @@ class PlotCorrAnalyzeLDA:
         for pos_train_idx_of_idx, pos_test_idx_of_idx in n_fold.split(positive_index_list):
             pos_train_idx, pos_test_idx = \
                 positive_index_list[pos_train_idx_of_idx], positive_index_list[pos_test_idx_of_idx]
-            # print(train_idx_list[idx_fold])
-            # print(pos_train_idx)
-            # train_idx_list[idx_fold] = pos_train_idx + train_idx_list[idx_fold]
-            # test_idx_list[idx_fold] = pos_test_idx + test_idx_list[idx_fold]
             train_idx_list[idx_fold] = np.concatenate((train_idx_list[idx_fold], pos_train_idx))
             test_idx_list[idx_fold] = np.concatenate((test_idx_list[idx_fold], pos_test_idx))
             idx_fold += 1
@@ -224,9 +223,11 @@ class PlotCorrAnalyzeLDA:
             estimate_prob = lda_obj.predict_proba(data_X_test)[:, int(num_classes) - 1]
             estimate_prob_list.append(estimate_prob)
             data_Y_list.append((data_Y_test == num_classes - 1).astype(int))
+            projected = lda_obj.transform(data_X_test)
+            projected_list.append(projected[:, 0])
             logger.info(f'Num of positive sample in test group {np.sum(data_Y_test)}')
 
-        return estimate_prob_list, data_Y_list
+        return estimate_prob_list, data_Y_list, projected_list
 
     def _get_roc_input(self, target_df, field_flag):
         lda_trained = self._train_LDA(target_df, field_flag, n_components=1)
@@ -268,7 +269,13 @@ class PlotCorrAnalyzeLDA:
                 gt_label = gt_label_list[idx_fold]
                 auc_val = round(metrics.roc_auc_score(gt_label, prob), 3)
                 fpr, tpr, _ = metrics.roc_curve(gt_label, prob, pos_label=1)
-                plt.plot(fpr, tpr, label=f'Fold: {idx_fold+1}, AUC: {auc_val}')
+                # precision, recall, _ = metrics.precision_recall_curve(gt_label, prob)
+                # print(precision)
+                # print(recall)
+                # auc_val = round(metrics.auc(recall, precision), 3)
+                num_pos_test = np.sum(gt_label)
+                plt.plot(fpr, tpr, label=f'Fold: {idx_fold+1}, # pos val: {num_pos_test}, AUC: {auc_val}')
+                # plt.plot(recall, precision, label=f'Fold: {idx_fold + 1}, # pos val: {num_pos_test}, AUC (PR): {auc_val}')
                 field_auc_dict[f'fold_{idx_fold+1}'] = auc_val
 
             # plt.xlabel('False positive rate')
@@ -284,10 +291,133 @@ class PlotCorrAnalyzeLDA:
         logger.info(f'Save roc png to {roc_png_path}')
         plt.savefig(roc_png_path)
 
-        auc_csv_path = os.path.join(out_folder, 'auc_separate.csv')
-        df_auc = pd.DataFrame.from_dict(auc_dict, orient='index')
-        logger.info(f'Save auc csv to {auc_csv_path}')
-        df_auc.to_csv(auc_csv_path)
+        # auc_csv_path = os.path.join(out_folder, 'auc_separate.csv')
+        # df_auc = pd.DataFrame.from_dict(auc_dict, orient='index')
+        # logger.info(f'Save auc csv to {auc_csv_path}')
+        # df_auc.to_csv(auc_csv_path)
+
+    def save_5_fold_roc_pr_separate(self, field_list, out_folder):
+        fig = plt.figure(figsize=(16, 10))
+        # gs = gridspec.GridSpec(2, 3)
+        gs = gridspec.GridSpec(1, 2)
+
+        idx_field = 0
+        for field_flag in field_list:
+            logger.info(f'Run 5 fold LDA on {field_flag}')
+            df_field, label_list = self._get_df_field(field_flag)
+            prob_list, gt_label_list = self._get_5_fold_roc_separate_input(df_field, field_flag)
+
+            ax = plt.subplot(gs[0])
+            for idx_fold in range(5):
+                prob = prob_list[idx_fold]
+                gt_label = gt_label_list[idx_fold]
+                auc_val = round(metrics.roc_auc_score(gt_label, prob), 3)
+                fpr, tpr, _ = metrics.roc_curve(gt_label, prob, pos_label=1)
+                num_pos_test = np.sum(gt_label)
+                plt.plot(fpr, tpr, label=f'Fold: {idx_fold+1}, # pos val: {num_pos_test}, AUC: {auc_val}')
+
+            plt.xlabel('False positive rate')
+            plt.ylabel('True positive rate')
+            plt.title(f'ROC - {field_flag}')
+            plt.legend(loc='best')
+
+            ax = plt.subplot(gs[1])
+            for idx_fold in range(5):
+                prob = prob_list[idx_fold]
+                gt_label = gt_label_list[idx_fold]
+                precision, recall, _ = metrics.precision_recall_curve(gt_label, prob)
+                auc_val = round(metrics.auc(recall, precision), 3)
+                num_pos_test = np.sum(gt_label)
+                plt.plot(recall, precision, label=f'Fold: {idx_fold + 1}, # pos val: {num_pos_test}, AUC (PR): {auc_val}')
+
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.title(f'Recall-precision - {field_flag}')
+            plt.legend(loc='best')
+
+            idx_field += 1
+
+        roc_png_path = os.path.join(out_folder, 'roc_separate.png')
+        logger.info(f'Save roc png to {roc_png_path}')
+        plt.savefig(roc_png_path)
+        plt.close()
+
+        # auc_csv_path = os.path.join(out_folder, 'auc_separate.csv')
+        # df_auc = pd.DataFrame.from_dict(auc_dict, orient='index')
+        # logger.info(f'Save auc csv to {auc_csv_path}')
+        # df_auc.to_csv(auc_csv_path)
+
+    def save_5_fold_roc_pr_distribution(self, field_flag, out_folder):
+        fig = plt.figure(figsize=(16, 10))
+        gs = gridspec.GridSpec(1, 2)
+        gs0 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs[0])
+        gs1 = gridspec.GridSpecFromSubplotSpec(5, 1, subplot_spec=gs[1])
+
+        logger.info(f'Run 5 fold LDA on {field_flag}')
+        df_field, label_list = self._get_df_field(field_flag)
+        prob_list, gt_label_list, projected_list = self._get_5_fold_roc_separate_input(df_field, field_flag)
+
+        ax = plt.subplot(gs0[0])
+        for idx_fold in range(5):
+            prob = prob_list[idx_fold]
+            gt_label = gt_label_list[idx_fold]
+            auc_val = round(metrics.roc_auc_score(gt_label, prob), 3)
+            fpr, tpr, _ = metrics.roc_curve(gt_label, prob, pos_label=1)
+            num_pos_test = np.sum(gt_label)
+            plt.plot(fpr, tpr, label=f'Fold: {idx_fold + 1}, # pos val: {num_pos_test}, AUC: {auc_val}')
+
+        plt.xlabel('False positive rate')
+        plt.ylabel('True positive rate')
+        plt.title(f'ROC - {field_flag}')
+        plt.legend(loc='best')
+
+        ax = plt.subplot(gs0[1])
+        for idx_fold in range(5):
+            prob = prob_list[idx_fold]
+            gt_label = gt_label_list[idx_fold]
+            precision, recall, _ = metrics.precision_recall_curve(gt_label, prob)
+            auc_val = round(metrics.auc(recall, precision), 3)
+            num_pos_test = np.sum(gt_label)
+            plt.plot(recall, precision,
+                     label=f'Fold: {idx_fold + 1}, # pos val: {num_pos_test}, AUC (PR): {auc_val}')
+
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title(f'Recall-precision - {field_flag}')
+        plt.legend(loc='best')
+
+        for idx_fold in range(5):
+            ax = plt.subplot(gs1[idx_fold])
+            # prob = prob_list[idx_fold]
+            gt_label = gt_label_list[idx_fold]
+            projected = projected_list[idx_fold]
+            gt_label = np.array(gt_label)
+            projected = np.array(projected)
+            plt.hist(projected[gt_label == 0], 10, normed=1, facecolor='blue', alpha=0.5)
+            y_vals = np.random.normal(0, 0.01, len(gt_label))
+            plt.scatter(
+                projected,
+                gt_label + y_vals,
+                c=gt_label,
+                cmap='jet',
+                alpha=0.3
+            )
+            plt.ylim(bottom=np.min(gt_label) - 1, top=np.max(gt_label) + 1)
+            y_tick_pos = np.arange(2)
+            ax.set_yticks(y_tick_pos)
+            ax.set_yticklabels(['neg (val)', 'pos (val)'])
+            ax.tick_params(which='minor', labelsize=20)
+            # plt.title(f'Fold {idx_fold}')
+
+        roc_png_path = os.path.join(out_folder, 'roc_separate.png')
+        logger.info(f'Save roc png to {roc_png_path}')
+        plt.savefig(roc_png_path)
+        plt.close()
+
+        # auc_csv_path = os.path.join(out_folder, 'auc_separate.csv')
+        # df_auc = pd.DataFrame.from_dict(auc_dict, orient='index')
+        # logger.info(f'Save auc csv to {auc_csv_path}')
+        # df_auc.to_csv(auc_csv_path)
 
     def save_5_fold_roc(self, field_list, out_folder):
         for field_flag in field_list:
@@ -493,6 +623,11 @@ class PlotCorrAnalyzeLDA:
         self.plot_correlation_bar(field_flag, out_png)
 
     @staticmethod
+    def add_label_incidental_cancer_flag(in_df):
+        cancer_df = in_df[in_df['Cancer'] == 1]
+        print(cancer_df.groupby('SubjectID').Time2Diag)
+
+    @staticmethod
     def generate_effective_data_csv(data_array, label_obj, out_csv):
         data_dict = {}
         attribute_list = PlotCorrAnalyzeLDA.attribute_list()
@@ -515,6 +650,14 @@ class PlotCorrAnalyzeLDA:
             item_dict['Cancer'] = item_dict['cancer_bengin']
             item_dict['COPD'] = item_dict['copd']
             item_dict['Packyear'] = item_dict['packyearsreported']
+            item_dict['SubjectID'] = label_obj._get_subject_id_from_file_name(scan_name)
+            item_dict['ScanDate'] = label_obj._get_date_str_from_file_name(scan_name)
+            if item_dict['Cancer'] == 1:
+                scan_date_obj = ClinicalDataReaderSPORE._get_date_str_from_file_name(scan_name)
+                diag_date_obj = datetime.datetime.strptime(str(int(item_dict['diag_date'])), '%Y%m%d')
+                print(str(int(item_dict['diag_date'])))
+                print(diag_date_obj)
+                item_dict['Time2Diag'] = diag_date_obj - scan_date_obj
 
             # BMI = mass(lb)/height(inch)^2 * 703
             bmi_val = np.nan
@@ -531,6 +674,7 @@ class PlotCorrAnalyzeLDA:
             data_dict[scan_name] = item_dict
 
         df = pd.DataFrame.from_dict(data_dict, orient='index')
+        PlotCorrAnalyzeLDA.add_label_incidental_cancer_flag(df)
 
         logger.info(f'Save to csv {out_csv}')
         df.to_csv(out_csv)
@@ -580,7 +724,7 @@ class PlotCorrAnalyzeLDA:
         return [
             'Age', 'sex', 'race', 'ctscannermake', 'heightinches',
             'weightpounds', 'packyearsreported', 'copd', 'Coronary Artery Calcification',
-            'cancer_bengin'
+            'cancer_bengin', 'diag_date'
         ]
 
     @staticmethod
@@ -599,9 +743,9 @@ def main():
 
     out_csv = os.path.join(args.out_png_folder, 'data_full.csv')
 
-    # low_dim_array = load_object(args.in_pca_data_bin)
-    # label_obj = ClinicalDataReaderSPORE.create_spore_data_reader_xlsx(args.label_file)
-    # PlotCorrAnalyzeLDA.generate_effective_data_csv(low_dim_array, label_obj, out_csv)
+    low_dim_array = load_object(args.in_pca_data_bin)
+    label_obj = ClinicalDataReaderSPORE.create_spore_data_reader_xlsx(args.label_file)
+    PlotCorrAnalyzeLDA.generate_effective_data_csv(low_dim_array, label_obj, out_csv)
 
     plot_obj = PlotCorrAnalyzeLDA.create_class_object_w_csv(out_csv)
 
@@ -660,10 +804,10 @@ def main():
     #     args.out_png_folder
     # )
 
-    plot_obj.save_5_fold_roc_separate(
-        ['Cancer'],
-        args.out_png_folder
-    )
+    # plot_obj.save_5_fold_roc_pr_distribution(
+    #     'Cancer',
+    #     args.out_png_folder
+    # )
 
 if __name__ == '__main__':
     main()
