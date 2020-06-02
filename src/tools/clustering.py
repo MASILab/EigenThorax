@@ -1,6 +1,3 @@
-import argparse
-from tools.clinical import ClinicalDataReaderSPORE
-from tools.data_io import load_object
 from tools.utils import get_logger
 import pandas as pd
 import os
@@ -17,34 +14,119 @@ from sklearn.manifold import LocallyLinearEmbedding
 logger = get_logger('KMeans')
 
 
-class KMeansClusterAnalyzer:
-    def __init__(self, label_df):
-        self._label_df = label_df
-        self._n_feature = 20
+class ClusterAnalysisDimAnalyzer:
+    def __init__(self, data_dict, n_features):
+        self._data_dict = data_dict
+        self._n_feature = n_features
         self._kmean_n_cluster_range = range(3, 9)
         self._bar_w = 0.12
-        self._n_init = 1000
+        self._n_init_kmeans = 10000
         self._con_factor = 0.6
 
-    def plot_kmean_n_cluster_field_list_exclude_cancer_in_1_year(self, field_list, n_cluster, out_png_folder):
-        df_field = self._label_df[self._label_df['CancerIncubation'] != 0]
-        df_field = self._modify_df_field_value(df_field, field_list)
+    def run_repeating_test(self, field_flag, n_cluster, n_repeat, out_png_folder):
+        df_field_ori = self._get_dataframe_from_data_dict()
+        df_field = df_field_ori[df_field_ori['CancerSubjectFirstScan'] != 0]
+        df_field = self._modify_df_field_value(df_field, ['CancerSubjectFirstScan'])
 
-        data_X, _ = self._get_features_and_labels(df_field, 'CancerIncubation')
+        data_X, data_Y = self._get_features_and_labels(df_field, field_flag)
 
-        logger.info(f'Run k-means')
-        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init).fit(data_X)
-        pred_labels = k_mean.labels_
+        ami_val_list = np.zeros((n_repeat,), dtype=float)
+        for itr_idx in range(n_repeat):
+            logger.info(f'Run repeating k-means, itr idx {itr_idx}')
+            k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
+            pred_labels = k_mean.labels_
+            data_embedded = self._2D_embed(data_X, pred_labels, 'con_TSNE', self._con_factor)
 
-        self._plot_bar_figure(pred_labels, field_list, df_field, out_png_folder)
+            out_png_2d_embedded = os.path.join(out_png_folder, f'2d_embedded_{itr_idx}.png')
+            self.plot_one_2d_embeded_result(pred_labels, data_embedded, field_flag, df_field, out_png_2d_embedded)
+            out_png_bar = os.path.join(out_png_folder, f'bar_{itr_idx}.png')
+            self.plot_one_bar_result(pred_labels, field_flag, df_field, out_png_bar)
 
-        data_embedded_tsne = self._2D_embed(data_X, pred_labels, 'TSNE')
-        self._plot_cluster_2d_embedded(data_embedded_tsne, pred_labels, out_png_folder)
+            metric_ami = adjusted_mutual_info_score(data_Y, pred_labels)
+            ami_val_list[itr_idx] = metric_ami
 
-        data_embedded = self._2D_embed(data_X, pred_labels, 'con_TSNE', self._con_factor)
-        # self._plot_cluster_2d_embedded(data_embedded, pred_labels, out_png_folder)
+        logger.info(f'AMI: mean {np.mean(ami_val_list):.2}, std {np.std(ami_val_list):.2}')
 
-        self._plot_cluster_with_label_2d_embedded(data_embedded, field_list, df_field, out_png_folder)
+    def plot_one_2d_embeded_result(self, pred_labels, data_embedded, field_flag, df_field, out_png_path):
+        # Plot
+        fig, ax = plt.subplots(figsize=(20, 14))
+        label_list = self._get_field_label_list(field_flag, df_field)
+        _, data_Y = self._get_features_and_labels(df_field, field_flag)
+
+        n_cluster = np.max(pred_labels) + 1
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            data_embedded_cluster = data_embedded[cluster_idx_list]
+            cluster_size = len(cluster_idx_list[0])
+            ax.scatter(
+                data_embedded_cluster[:, 0],
+                data_embedded_cluster[:, 1],
+                alpha=0.4,
+                label=f'Cluster {idx_cluster + 1} (size {cluster_size})'
+            )
+
+        special_label_val = 1
+        label_idx_list = np.where(data_Y == special_label_val)
+        label_data_embedded = data_embedded[label_idx_list]
+        ax.scatter(
+            label_data_embedded[:, 0],
+            label_data_embedded[:, 1],
+            marker='+',
+            color='red',
+            s=200,
+            label=f'{label_list[special_label_val]}'
+        )
+
+        plt.title(f'2D embedded plot, {field_flag}')
+        plt.legend(loc='best')
+        logger.info(f'Save png to {out_png_path}')
+        plt.savefig(out_png_path)
+        plt.close()
+
+    def plot_one_bar_result(self, pred_labels, field_flag, df_field, out_png_path):
+        cluster_size = []
+        n_cluster = np.max(pred_labels) + 1
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            cluster_size.append(len(cluster_idx_list[0]))
+
+        sort_idx_list = np.argsort(cluster_size)
+
+        fig, ax = plt.subplots(figsize=(20, 14))
+        label_list = self._get_field_label_list(field_flag, df_field)
+
+        _, data_Y = self._get_features_and_labels(df_field, field_flag)
+        true_label_ratio_per_cluster = np.zeros((len(label_list), n_cluster), dtype=float)
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            cluster_true_label_list = data_Y[cluster_idx_list]
+            for idx_label in range(len(label_list)):
+                true_label_ratio_per_cluster[idx_label, idx_cluster] = \
+                    np.count_nonzero(cluster_true_label_list == idx_label) / \
+                    len(cluster_idx_list[0])
+
+        base_x_locs = np.arange(n_cluster)
+        for idx_label in range(len(label_list)):
+            off_set = self._bar_w * (idx_label - 0.5 * len(label_list) + 0.5)
+            ax.bar(base_x_locs + off_set, true_label_ratio_per_cluster[idx_label, sort_idx_list],
+                   width=self._bar_w, align='center', label=label_list[idx_label])
+
+        metric_ami = adjusted_mutual_info_score(data_Y, pred_labels)
+
+        plt.title(f'{field_flag}, KMean {n_cluster} cluster, AMI {metric_ami:.2}')
+        plt.legend(loc='best')
+
+        plt.xlim(left=-1, right=n_cluster)
+        x_tick_pos = np.arange(n_cluster)
+        ax.set_xticks(x_tick_pos)
+        ax.set_xticklabels(cluster_size)
+
+        plt.xlabel('Cluster size')
+        plt.ylabel('Label ratio')
+
+        logger.info(f'Save to {out_png_path}')
+        plt.savefig(out_png_path)
+        plt.close()
 
     def plot_kmean_n_cluster_field_list_cancer_subject_first_scan(self, field_list, n_cluster, out_png_folder):
         df_field = self._label_df[self._label_df['CancerSubjectFirstScan'] != 0]
@@ -66,7 +148,11 @@ class KMeansClusterAnalyzer:
 
         self._plot_cluster_with_label_2d_embedded(data_embedded, field_list, df_field, out_png_folder)
 
-    def _plot_bar_figure(self, pred_labels, field_list, df_field, out_png_folder):
+    def _plot_bar_figure(self,
+                         pred_labels,
+                         field_list,
+                         df_field,
+                         out_png_folder):
         cluster_size = []
         n_cluster = np.max(pred_labels) + 1
         for idx_cluster in range(n_cluster):
@@ -460,6 +546,32 @@ class KMeansClusterAnalyzer:
 
         return df_field, label_list
 
+    def _get_dataframe_from_data_dict(self):
+        new_data_dict = {}
+        count_cancer = 0
+        count_first_cancer = 0
+        for scan_name in self._data_dict:
+            new_data_item = self._data_dict[scan_name]
+            image_data = new_data_item.pop('ImageData')
+            for idx_image_feature in range(self._n_feature):
+                pc_name_str = self._get_pc_str(idx_image_feature)
+                new_data_item[pc_name_str] = image_data[idx_image_feature]
+            new_data_dict[scan_name] = new_data_item
+            if 'CancerSubjectFirstScan' in new_data_item:
+                if new_data_item['CancerSubjectFirstScan'] == 1:
+                    count_first_cancer += 1
+            # if ('CancerSubjectFirstScan' in new_data_item):
+            #     count_first_cancer += 1
+            if "Cancer" in new_data_item:
+                if new_data_item['Cancer'] == 1:
+                    count_cancer += 1
+            # if ("Cancer" in new_data_item):
+            #     count_cancer += 1
+        logger.info(f'Count first cancer: {count_first_cancer}')
+        logger.info(f'Count cancer: {count_cancer}')
+        df = pd.DataFrame.from_dict(new_data_dict, orient='index')
+        return df
+
     @staticmethod
     def _count_num_field(df, field_flag, field_val):
         return df[df[field_flag] == field_val].shape[0]
@@ -467,29 +579,3 @@ class KMeansClusterAnalyzer:
     @staticmethod
     def _get_pc_str(idx):
         return f'pc{idx}'
-
-def main():
-    parser = argparse.ArgumentParser(description='KMean clustering analysis')
-    parser.add_argument('--data-csv', type=str, )
-    parser.add_argument('--out-png-folder', type=str)
-    parser.add_argument('--n-cluster', type=int, default=10)
-    args = parser.parse_args()
-
-    data_df = pd.read_csv(args.data_csv)
-    kmean_analyzer = KMeansClusterAnalyzer(data_df)
-
-    # kmean_analyzer.plot_kmean_series('COPD', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('bmi', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Cancer', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('CAC', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Age', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Packyear', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('CancerIncubation', args.out_png_folder)
-
-    kmean_analyzer.plot_kmean_n_cluster_field_list_cancer_subject_first_scan(
-        ['CancerSubjectFirstScan', 'COPD', 'Coronary Artery Calcification', 'Age', 'Packyear', 'bmi'],
-        10, args.out_png_folder)
-
-
-if __name__ == '__main__':
-    main()

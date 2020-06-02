@@ -1,23 +1,13 @@
 import argparse
-from tools.pca import PCA_NII_3D
-import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
-from matplotlib.ticker import MaxNLocator
 from tools.clinical import ClinicalDataReaderSPORE
 from tools.data_io import load_object
 from tools.utils import get_logger
-import pandas as pd
-import os
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn import metrics
-from sklearn.model_selection import KFold
-import matplotlib.gridspec as gridspec
-import matplotlib.mlab as mlab
 import datetime
+from tools.data_io import save_object
 
 
-logger = get_logger('ClusterDataCSV')
+logger = get_logger('ClusterDataDictBin')
 
 
 def get_attribute_list():
@@ -28,11 +18,7 @@ def get_attribute_list():
     ]
 
 
-def get_pc_str(idx):
-    return f'pc{idx}'
-
-
-def generate_effective_data_csv(data_array, label_obj, out_csv):
+def generate_data_dict(data_array, label_obj):
     data_dict = {}
     attribute_list = get_attribute_list()
     for data_item in data_array:
@@ -45,8 +31,6 @@ def generate_effective_data_csv(data_array, label_obj, out_csv):
             scan_name_as_record = label_obj.check_nearest_record_for_impute(scan_name)
             if scan_name_as_record is None:
                 continue
-            # else:
-            #     logger.info(f'Using nearest record {scan_name_as_record}')
 
         for attr in attribute_list:
             item_dict[attr] = label_obj.get_value_field(scan_name_as_record, attr)
@@ -75,29 +59,26 @@ def generate_effective_data_csv(data_array, label_obj, out_csv):
             bmi_val = 703 * mass_lb / (height_inch * height_inch)
         item_dict['bmi'] = bmi_val
 
-        for pc_idx in range(20):
-            attr_str = get_pc_str(pc_idx)
-            item_dict[attr_str] = data_item['low_dim'][pc_idx]
+        # Image data
+        item_dict['ImageData'] = data_item['low_dim']
 
         data_dict[scan_name] = item_dict
 
-    df = pd.DataFrame.from_dict(data_dict, orient='index')
-    logger.info(f'Save to csv {out_csv}')
-    df.to_csv(out_csv)
+    return data_dict
 
 
 def main():
     parser = argparse.ArgumentParser(description='Load a saved pca object')
     parser.add_argument('--in-pca-data-bin', type=str)
     parser.add_argument('--label-file', type=str)
-    parser.add_argument('--out-data-csv', type=str)
+    parser.add_argument('--out-data-dict-bin', type=str)
     args = parser.parse_args()
-
-    out_csv = args.out_data_csv
 
     low_dim_array = load_object(args.in_pca_data_bin)
     label_obj = ClinicalDataReaderSPORE.create_spore_data_reader_xlsx(args.label_file)
-    generate_effective_data_csv(low_dim_array, label_obj, out_csv)
+    data_dict = generate_data_dict(low_dim_array, label_obj)
+    logger.info(f'Save dict data object to {args.out_data_dict_bin}')
+    save_object(data_dict, args.out_data_dict_bin)
 
 
 if __name__ == '__main__':

@@ -17,43 +17,28 @@ from sklearn.manifold import LocallyLinearEmbedding
 logger = get_logger('KMeans')
 
 
-class KMeansClusterAnalyzer:
-    def __init__(self, label_df):
-        self._label_df = label_df
-        self._n_feature = 20
+class ClusterAnalysisDimAnalyzer:
+    def __init__(self, data_dict, n_features):
+        self._data_dict = data_dict
+        self._n_feature = n_features
         self._kmean_n_cluster_range = range(3, 9)
         self._bar_w = 0.12
-        self._n_init = 1000
+        self._n_init_kmeans = 10000
         self._con_factor = 0.6
 
-    def plot_kmean_n_cluster_field_list_exclude_cancer_in_1_year(self, field_list, n_cluster, out_png_folder):
-        df_field = self._label_df[self._label_df['CancerIncubation'] != 0]
-        df_field = self._modify_df_field_value(df_field, field_list)
-
-        data_X, _ = self._get_features_and_labels(df_field, 'CancerIncubation')
-
-        logger.info(f'Run k-means')
-        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init).fit(data_X)
-        pred_labels = k_mean.labels_
-
-        self._plot_bar_figure(pred_labels, field_list, df_field, out_png_folder)
-
-        data_embedded_tsne = self._2D_embed(data_X, pred_labels, 'TSNE')
-        self._plot_cluster_2d_embedded(data_embedded_tsne, pred_labels, out_png_folder)
-
-        data_embedded = self._2D_embed(data_X, pred_labels, 'con_TSNE', self._con_factor)
-        # self._plot_cluster_2d_embedded(data_embedded, pred_labels, out_png_folder)
-
-        self._plot_cluster_with_label_2d_embedded(data_embedded, field_list, df_field, out_png_folder)
-
-    def plot_kmean_n_cluster_field_list_cancer_subject_first_scan(self, field_list, n_cluster, out_png_folder):
-        df_field = self._label_df[self._label_df['CancerSubjectFirstScan'] != 0]
+    def plot_kmean_n_cluster_field_list_cancer_subject_first_scan(
+            self,
+            field_list,
+            n_cluster,
+            out_png_folder):
+        df_field_ori = self._get_dataframe_from_data_dict()
+        df_field = df_field_ori[df_field_ori['CancerSubjectFirstScan'] != 0]
         df_field = self._modify_df_field_value(df_field, field_list)
 
         data_X, _ = self._get_features_and_labels(df_field, 'CancerSubjectFirstScan')
 
         logger.info(f'Run k-means')
-        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init).fit(data_X)
+        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
         pred_labels = k_mean.labels_
 
         self._plot_bar_figure(pred_labels, field_list, df_field, out_png_folder)
@@ -103,6 +88,7 @@ class KMeansClusterAnalyzer:
 
             metric_ami = adjusted_mutual_info_score(data_Y, pred_labels)
 
+            logger.info(f'{field_flag}, AMI = {metric_ami:.2}')
             plt.title(f'{field_flag}, KMean {n_cluster} cluster, AMI {metric_ami:.2}')
             plt.legend(loc='best')
 
@@ -341,6 +327,7 @@ class KMeansClusterAnalyzer:
         elif field_flag == 'CancerSubjectFirstScan':
             df_field = ori_df[ori_df[field_flag] != 0]
             df_field = df_field.fillna(value={field_flag: 0})
+            print(f'df, Cancer first scan count {df_field[df_field[field_flag] == 1].shape[0]}')
         else:
             raise NotImplementedError
 
@@ -460,6 +447,32 @@ class KMeansClusterAnalyzer:
 
         return df_field, label_list
 
+    def _get_dataframe_from_data_dict(self):
+        new_data_dict = {}
+        count_cancer = 0
+        count_first_cancer = 0
+        for scan_name in self._data_dict:
+            new_data_item = self._data_dict[scan_name]
+            image_data = new_data_item.pop('ImageData')
+            for idx_image_feature in range(self._n_feature):
+                pc_name_str = self._get_pc_str(idx_image_feature)
+                new_data_item[pc_name_str] = image_data[idx_image_feature]
+            new_data_dict[scan_name] = new_data_item
+            if 'CancerSubjectFirstScan' in new_data_item:
+                if new_data_item['CancerSubjectFirstScan'] == 1:
+                    count_first_cancer += 1
+            # if ('CancerSubjectFirstScan' in new_data_item):
+            #     count_first_cancer += 1
+            if "Cancer" in new_data_item:
+                if new_data_item['Cancer'] == 1:
+                    count_cancer += 1
+            # if ("Cancer" in new_data_item):
+            #     count_cancer += 1
+        logger.info(f'Count first cancer: {count_first_cancer}')
+        logger.info(f'Count cancer: {count_cancer}')
+        df = pd.DataFrame.from_dict(new_data_dict, orient='index')
+        return df
+
     @staticmethod
     def _count_num_field(df, field_flag, field_val):
         return df[df[field_flag] == field_val].shape[0]
@@ -470,25 +483,18 @@ class KMeansClusterAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(description='KMean clustering analysis')
-    parser.add_argument('--data-csv', type=str, )
+    parser.add_argument('--in-data-dict-bin', type=str)
+    parser.add_argument('--n-features', type=int)
     parser.add_argument('--out-png-folder', type=str)
     parser.add_argument('--n-cluster', type=int, default=10)
     args = parser.parse_args()
 
-    data_df = pd.read_csv(args.data_csv)
-    kmean_analyzer = KMeansClusterAnalyzer(data_df)
-
-    # kmean_analyzer.plot_kmean_series('COPD', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('bmi', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Cancer', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('CAC', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Age', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('Packyear', args.out_png_folder)
-    # kmean_analyzer.plot_kmean_series('CancerIncubation', args.out_png_folder)
+    in_data_dict = load_object(args.in_data_dict_bin)
+    kmean_analyzer = ClusterAnalysisDimAnalyzer(in_data_dict, args.n_features)
 
     kmean_analyzer.plot_kmean_n_cluster_field_list_cancer_subject_first_scan(
         ['CancerSubjectFirstScan', 'COPD', 'Coronary Artery Calcification', 'Age', 'Packyear', 'bmi'],
-        10, args.out_png_folder)
+        args.n_cluster, args.out_png_folder)
 
 
 if __name__ == '__main__':

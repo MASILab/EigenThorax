@@ -94,6 +94,23 @@ class ClinicalDataReaderSPORE:
 
         return return_val
 
+    def is_first_cancer_scan(self, file_name_nii_gz):
+        spore_name_field = self._get_name_field_flat_from_sub_id(
+            self._get_subject_id_from_file_name(file_name_nii_gz)
+        )
+        spore_date_field = self._get_date_str_from_file_name(file_name_nii_gz)
+        spore_date_field = np.datetime64(spore_date_field.strftime('%Y-%m-%d'))
+
+        subject_df = self._df[self._df['SPORE'] == spore_name_field]
+        study_date_list = subject_df['studydate'].values
+        # print(study_date_list)
+        # print(spore_date_field)
+        # print(study_date_list - spore_date_field)
+        study_date_delta_days = (study_date_list - spore_date_field) / \
+                                np.timedelta64(1, 'D')
+        min_delta = np.min(study_date_delta_days)
+        return int(min_delta == 0)
+
     @staticmethod
     def _get_date_str_from_file_name(file_name_nii_gz):
         match_list = re.match(r"(?P<subject_id>\d+)time(?P<time_id>\d+).nii.gz", file_name_nii_gz)
