@@ -30,3 +30,11 @@ class EigenThoraxLinearRegression1D:
         logger.info(f'Projected data_X with shape {projected_data_X.shape}')
 
         return projected_data_X
+
+    def project_to_dominant_space(self):
+        bmi_space = np.zeros((len(self._linear_reg.coef_), 1))
+        bmi_space[:, 0] = self._linear_reg.coef_[:]
+
+        projected_data_X = np.matmul(self._data_X, bmi_space)
+
+        return projected_data_X

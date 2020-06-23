@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_mutual_info_score
+from sklearn.metrics import adjusted_mutual_info_score, silhouette_score
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.manifold import TSNE
 from sklearn.manifold import LocallyLinearEmbedding
@@ -14,14 +14,180 @@ from sklearn.manifold import LocallyLinearEmbedding
 logger = get_logger('KMeans')
 
 
+class ClusterAnalysisSearchNumCluster:
+    def __init__(self, data_dict_obj):
+        self._data_dict_obj = data_dict_obj
+        self._n_init_kmeans = 10
+        self._kmean_n_cluster_range = range(1, 11)
+        self._random_state = 768
+
+    def ElbowSilhouettePlot(self, elbow_png, silhouette_png):
+        fig, ax = plt.subplots(figsize=(20, 14))
+        logger.info(f'Show elbow plot.')
+
+        data_X, _ = self._data_dict_obj.get_features_and_labels('bmi')
+
+        elbow_list = np.zeros((len(self._kmean_n_cluster_range),), dtype=float)
+        silhouette_list = np.zeros((len(self._kmean_n_cluster_range),), dtype=float)
+        idx_cluster = 0
+        for n_cluster in self._kmean_n_cluster_range:
+            logger.info(f'Run n_cluster {n_cluster}')
+            k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
+
+            elbow_list[idx_cluster] = k_mean.inertia_
+            if idx_cluster > 0:
+                silhouette_list[idx_cluster] = silhouette_score(data_X, k_mean.labels_, metric='cosine')
+
+            idx_cluster += 1
+
+        plt.figure(figsize=(16, 10))
+        plt.bar(self._kmean_n_cluster_range, elbow_list)
+        plt.title('Sum of squared distances / n-cluster')
+        logger.info(f'Output to {elbow_png}')
+        plt.savefig(elbow_png)
+        plt.close()
+
+        plt.figure(figsize=(16, 10))
+        plt.bar(self._kmean_n_cluster_range, silhouette_list)
+        plt.title('Silhouette score / n-cluster')
+        logger.info(f'Output to {silhouette_png}')
+        plt.savefig(silhouette_png)
+        plt.close()
+
+    def get_elbow_and_silhouette_array(self):
+        data_X, _ = self._data_dict_obj.get_features_and_labels('bmi')
+
+        elbow_list = np.zeros((len(self._kmean_n_cluster_range),), dtype=float)
+        silhouette_list = np.zeros((len(self._kmean_n_cluster_range),), dtype=float)
+        idx_cluster = 0
+        for n_cluster in self._kmean_n_cluster_range:
+            logger.info(f'Run n_cluster {n_cluster}')
+            k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans, random_state=self._random_state).fit(data_X)
+
+            elbow_list[idx_cluster] = k_mean.inertia_
+            if idx_cluster > 0:
+                silhouette_list[idx_cluster] = silhouette_score(data_X, k_mean.labels_, metric='cosine')
+
+            idx_cluster += 1
+
+        return elbow_list, silhouette_list
+
+
+
+
 class ClusterAnalysisDimAnalyzer:
     def __init__(self, data_dict, n_features):
         self._data_dict = data_dict
         self._n_feature = n_features
         self._kmean_n_cluster_range = range(3, 9)
         self._bar_w = 0.12
-        self._n_init_kmeans = 10000
+        # self._n_init_kmeans = 100
+        # self._n_init_kmeans = 10000
+        self._n_init_kmeans = 1000000
         self._con_factor = 0.6
+
+    def run_meta_data_kmeans(self,
+                             cluster_field_list,
+                             plot_field_flag,
+                             n_cluster,
+                             out_png_folder):
+        df_field_ori = self._get_dataframe_from_data_dict()
+        df_field = df_field_ori[df_field_ori['CancerSubjectFirstScan'] != 0]
+        df_field = self._modify_df_field_value(df_field, ['CancerSubjectFirstScan'])
+
+        num_field = len(cluster_field_list)
+        n_sample = df_field.shape[0]
+        data_X = np.zeros((n_sample, num_field), dtype=float)
+
+        for idx_field in range(num_field):
+            field_flag = cluster_field_list[idx_field]
+            data_X[:, idx_field] = df_field[field_flag].tolist()[:]
+
+        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
+        pred_labels = k_mean.labels_
+        data_embedded = self._2D_embed(data_X, pred_labels, 'con_TSNE', self._con_factor)
+
+        # Plot
+        out_png_2D_embedded = os.path.join(out_png_folder, '2d_embedded.png')
+        out_png_bar_plot = os.path.join(out_png_folder, 'bar_plot.png')
+        cluster_size = []
+        n_cluster = np.max(pred_labels) + 1
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            cluster_size.append(len(cluster_idx_list[0]))
+
+        # sort_idx_list = np.argsort(cluster_size)
+
+        fig, ax = plt.subplots(figsize=(20, 14))
+        label_list = self._get_field_label_list(plot_field_flag, df_field)
+
+        _, data_Y = self._get_features_and_labels(df_field, plot_field_flag)
+        true_label_ratio_per_cluster = np.zeros((len(label_list), n_cluster), dtype=float)
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            cluster_true_label_list = data_Y[cluster_idx_list]
+            for idx_label in range(len(label_list)):
+                true_label_ratio_per_cluster[idx_label, idx_cluster] = \
+                    np.count_nonzero(cluster_true_label_list == idx_label) / \
+                    len(cluster_idx_list[0])
+
+        base_x_locs = np.arange(n_cluster)
+        for idx_label in range(len(label_list)):
+            off_set = self._bar_w * (idx_label - 0.5 * len(label_list) + 0.5)
+            ax.bar(base_x_locs + off_set, true_label_ratio_per_cluster[idx_label],
+                   width=self._bar_w, align='center', label=label_list[idx_label])
+
+        metric_ami = adjusted_mutual_info_score(data_Y, pred_labels)
+
+        plt.title(f'{plot_field_flag}, KMean {n_cluster} cluster, AMI {metric_ami:.2}')
+        plt.legend(loc='best')
+
+        plt.xlim(left=-1, right=n_cluster)
+        x_tick_pos = np.arange(n_cluster)
+        ax.set_xticks(x_tick_pos)
+        ax.set_xticklabels(cluster_size)
+
+        plt.xlabel('Cluster size')
+        plt.ylabel('Label ratio')
+
+        logger.info(f'Save to {out_png_bar_plot}')
+        plt.savefig(out_png_bar_plot)
+        plt.close()
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(20, 14))
+        label_list = self._get_field_label_list(plot_field_flag, df_field)
+        _, data_Y = self._get_features_and_labels(df_field, plot_field_flag)
+
+        n_cluster = np.max(pred_labels) + 1
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+            data_embedded_cluster = data_embedded[cluster_idx_list]
+            cluster_size = len(cluster_idx_list[0])
+            ax.scatter(
+                data_embedded_cluster[:, 0],
+                data_embedded_cluster[:, 1],
+                alpha=0.4,
+                label=f'Cluster {idx_cluster + 1} (size {cluster_size})'
+            )
+
+        special_label_val = 1
+        label_idx_list = np.where(data_Y == special_label_val)
+        label_data_embedded = data_embedded[label_idx_list]
+        ax.scatter(
+            label_data_embedded[:, 0],
+            label_data_embedded[:, 1],
+            marker='+',
+            color='red',
+            s=200,
+            label=f'{label_list[special_label_val]}'
+        )
+
+        plt.title(f'2D embedded plot, {plot_field_flag}')
+        plt.legend(loc='best')
+        logger.info(f'Save png to {out_png_2D_embedded}')
+        plt.savefig(out_png_2D_embedded)
+        plt.close()
 
     def run_repeating_test(self, field_flag, n_cluster, n_repeat, out_png_folder):
         df_field_ori = self._get_dataframe_from_data_dict()
@@ -33,7 +199,7 @@ class ClusterAnalysisDimAnalyzer:
         ami_val_list = np.zeros((n_repeat,), dtype=float)
         for itr_idx in range(n_repeat):
             logger.info(f'Run repeating k-means, itr idx {itr_idx}')
-            k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
+            k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans, n_jobs=30).fit(data_X)
             pred_labels = k_mean.labels_
             data_embedded = self._2D_embed(data_X, pred_labels, 'con_TSNE', self._con_factor)
 
@@ -127,6 +293,29 @@ class ClusterAnalysisDimAnalyzer:
         logger.info(f'Save to {out_png_path}')
         plt.savefig(out_png_path)
         plt.close()
+
+    def get_optimal_AMI_cancer_first_year(self):
+        df_field_ori = self._get_dataframe_from_data_dict()
+        df_field = df_field_ori[df_field_ori['CancerSubjectFirstScan'] != 0]
+        df_field = self._modify_df_field_value(df_field, ['CancerSubjectFirstScan'])
+
+        field_flag = 'CancerSubjectFirstScan'
+        n_cluster = 10
+        n_pos_sample = 11
+
+        data_X, data_Y = self._get_features_and_labels(df_field, field_flag)
+        k_mean = KMeans(n_clusters=n_cluster, n_init=self._n_init_kmeans).fit(data_X)
+        pred_labels = k_mean.labels_
+
+        for idx_cluster in range(n_cluster):
+            cluster_idx_list = np.where(pred_labels == idx_cluster)
+
+            true_label_vec = np.zeros((len(pred_labels),), dtype=int)
+            true_label_vec[cluster_idx_list[0][:n_pos_sample]] = 1
+
+            ami_val = adjusted_mutual_info_score(true_label_vec, pred_labels)
+            cluster_size = len(cluster_idx_list[0])
+            logger.info(f'Cluster size {cluster_size}, AMI {ami_val:.2}')
 
     def plot_kmean_n_cluster_field_list_cancer_subject_first_scan(self, field_list, n_cluster, out_png_folder):
         df_field = self._label_df[self._label_df['CancerSubjectFirstScan'] != 0]
@@ -234,7 +423,6 @@ class ClusterAnalysisDimAnalyzer:
             logger.info(f'Save png to {out_png_path}')
             plt.savefig(out_png_path)
             plt.close()
-
 
     def _contract_cluster_data_to_center(self, data_X, pred_label, contract_ratio):
         updated_data_X = np.zeros(data_X.shape, dtype=float)

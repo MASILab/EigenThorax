@@ -3,6 +3,7 @@ from tools.utils import read_file_contents_list, convert_flat_2_3d, get_logger
 import nibabel as nib
 import numpy as np
 import pickle
+import pandas as pd
 
 logger = get_logger('DataFolder')
 
@@ -122,7 +123,6 @@ class ScanWrapper:
 
         return slice_x, slice_y, slice_z
 
-
     def save_scan_same_space(self, file_path, img_data):
         print(f'Saving image to {file_path}')
         img_obj = nib.Nifti1Image(img_data,
@@ -134,6 +134,156 @@ class ScanWrapper:
         img_shape = self.get_shape()
         data_3d = convert_flat_2_3d(data_flat, img_shape)
         self.save_scan_same_space(out_path, data_3d)
+
+
+class ClusterAnalysisDataDict:
+    def __init__(self, data_dict, n_feature):
+        self._data_dict = data_dict
+        self._n_feature = n_feature
+        self._df_field = self.get_df_field()
+
+    def get_df_field(self):
+        df_field_ori = self._get_dataframe_from_data_dict()
+        df_field = df_field_ori[df_field_ori['CancerSubjectFirstScan'] != 0]
+        df_field = self._modify_df_field_value(df_field, ['CancerSubjectFirstScan', 'CAC', 'COPD'])
+        return df_field
+
+    def get_features_and_labels(self, field_flag):
+        df_field = self._df_field
+        n_sample = df_field.shape[0]
+        data_X = np.zeros((n_sample, self._n_feature), dtype=float)
+        for feature_idx in range(self._n_feature):
+            pc_str = self._get_pc_str(feature_idx)
+            data_X[:, feature_idx] = df_field[pc_str].tolist()[:]
+        data_Y = df_field[field_flag].tolist()
+        data_Y = np.array(data_Y)
+
+        return data_X, data_Y
+
+    def get_num_feature(self):
+        return self._n_feature
+
+    def get_num_sample(self):
+        return len(self._data_dict)
+
+    def _get_dataframe_from_data_dict(self):
+        new_data_dict = {}
+        count_cancer = 0
+        count_first_cancer = 0
+        for scan_name in self._data_dict:
+            new_data_item = self._data_dict[scan_name]
+            image_data = new_data_item.pop('ImageData')
+            for idx_image_feature in range(self._n_feature):
+                pc_name_str = self._get_pc_str(idx_image_feature)
+                new_data_item[pc_name_str] = image_data[idx_image_feature]
+            new_data_dict[scan_name] = new_data_item
+            if 'CancerSubjectFirstScan' in new_data_item:
+                if new_data_item['CancerSubjectFirstScan'] == 1:
+                    count_first_cancer += 1
+            if "Cancer" in new_data_item:
+                if new_data_item['Cancer'] == 1:
+                    count_cancer += 1
+            if new_data_item['Packyear'] > 300:
+                new_data_item['Packyear'] = 51.34
+        logger.info(f'Count first cancer: {count_first_cancer}')
+        logger.info(f'Count cancer: {count_cancer}')
+        df = pd.DataFrame.from_dict(new_data_dict, orient='index')
+        return df
+
+    def _modify_df_field_value(self, ori_df, field_flag_list):
+        for field_flag in field_flag_list:
+            ori_df = self._modify_df_one_field(ori_df, field_flag)
+
+        return ori_df
+
+    def _modify_df_one_field(self, ori_df, field_flag):
+        if (field_flag == 'copd') | (field_flag == 'COPD'):
+            df_field = ori_df.fillna(value={field_flag: 2})
+            df_field = df_field.replace({field_flag: {'Yes': 1, 'No': 0}})
+        elif field_flag == 'Age':
+            df_field = ori_df
+            df_field.loc[ori_df[field_flag] < 60, field_flag] = 0
+            df_field.loc[(ori_df[field_flag] < 70) & (ori_df[field_flag] >= 60), field_flag] = 1
+            df_field.loc[ori_df[field_flag] >= 70, field_flag] = 2
+        elif (field_flag == 'packyearsreported') | (field_flag == 'Packyear'):
+            df_field = ori_df
+
+            df_field.loc[ori_df[field_flag] < 35, field_flag] = 0
+            df_field.loc[(ori_df[field_flag] >= 35) & (ori_df[field_flag] < 60), field_flag] = 1
+            df_field.loc[ori_df[field_flag] >= 60, field_flag] = 2
+
+        elif (field_flag == 'Coronary Artery Calcification') | (field_flag == 'CAC'):
+            df_field = ori_df
+            df_field.loc[df_field[field_flag] == 'None', field_flag] = 0
+            df_field.loc[df_field[field_flag] == 'Mild', field_flag] = 1
+            df_field.loc[df_field[field_flag] == 'Moderate', field_flag] = 2
+            df_field.loc[df_field[field_flag] == 'Severe', field_flag] = 3
+
+            df_field = df_field.replace(
+                {field_flag:
+                     {'Severe': 3, 'Moderate': 2, 'Mild': 1, 'None': 0}}
+            )
+
+        elif field_flag == 'bmi':
+            df_field = ori_df
+            df_field.loc[ori_df[field_flag] < 21, field_flag] = 0
+            df_field.loc[(ori_df[field_flag] >= 21) & (ori_df[field_flag] < 35), field_flag] = 1
+            df_field.loc[ori_df[field_flag] >= 35, field_flag] = 2
+        elif (field_flag == 'cancer_bengin') | (field_flag == 'Cancer'):
+            df_field = ori_df
+        elif field_flag == 'CancerIncubation':
+            df_field = ori_df[ori_df[field_flag] != 0]
+            df_field = df_field.fillna(value={field_flag: 0})
+        elif field_flag == 'CancerSubjectFirstScan':
+            df_field = ori_df[ori_df[field_flag] != 0]
+            df_field = df_field.fillna(value={field_flag: 0})
+        else:
+            raise NotImplementedError
+
+        return df_field
+
+
+    def _get_field_label_list(self, field_flag):
+        label_list = []
+        if (field_flag == 'copd') | (field_flag == 'COPD'):
+            label_list.append(f'copd:no ')
+            label_list.append(f'copd:yes ')
+            label_list.append(f'copd:unknown ')
+        elif field_flag == 'Age':
+            label_list.append(f'Age<60 ')
+            label_list.append(f'60<=Age<70 ')
+            label_list.append(f'Age>=70 ')
+        elif (field_flag == 'packyearsreported') | (field_flag == 'Packyear'):
+            label_list.append(f'packyear<35 ')
+            label_list.append(f'35<=packyear<60 ')
+            label_list.append(f'packyear>=60 ')
+        elif (field_flag == 'Coronary Artery Calcification') | (field_flag == 'CAC'):
+            label_list.append(f'CAC: None ')
+            label_list.append(f'CAC: Mild ')
+            label_list.append(f'CAC: Moderate ')
+            label_list.append(f'CAC: Severe ')
+        elif field_flag == 'bmi':
+            label_list.append(f'BMI < 21 ')
+            label_list.append(f'21 <= BMI < 35 ')
+            label_list.append(f'BMI >= 35 ')
+        elif (field_flag == 'cancer_bengin') | (field_flag == 'Cancer'):
+            label_list.append(f'non-cancer ')
+            label_list.append(f'cancer ')
+        elif field_flag == 'CancerIncubation':
+            label_list.append(f'non-cancer ')
+            label_list.append(f'cancer, time to diag >= 1y ')
+        elif field_flag == 'CancerSubjectFirstScan':
+            label_list.append(f'non-cancer ')
+            label_list.append(f'cancer, first scan ')
+        else:
+            raise NotImplementedError
+
+        return label_list
+
+
+    @staticmethod
+    def _get_pc_str(idx):
+        return f'pc{idx}'
 
 
 def save_object(object_to_save, file_path):
