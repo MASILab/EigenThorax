@@ -38,6 +38,7 @@ class ParalDimensionReduction(AbstractParallelRoutineSimple):
             result_list.append(result)
         return result_list
 
+
 def main():
     parser = argparse.ArgumentParser(description='Load a saved pca object')
     parser.add_argument('--load-pca-bin-path', type=str,

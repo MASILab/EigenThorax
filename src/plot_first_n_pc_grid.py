@@ -8,6 +8,7 @@ import matplotlib.gridspec as gridspec
 import os
 from tools.utils import get_logger
 from matplotlib import colors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 logger = get_logger('Plot - PC')
@@ -25,10 +26,10 @@ class PlotPCGrid:
         self._step_coronal = step_coronal,
         self._step_sagittal = step_sagittal,
         self._num_show_pc = num_show_pc
-        self._cm = 'jet'
+        self._cm = 'hsv'
         self._num_view = 3
         self._out_dpi = 20
-        self._num_clip = 5
+        self._num_clip = 1
         self._sub_title_font_size = 60
 
     def plot_pc(self, out_png):
@@ -41,8 +42,11 @@ class PlotPCGrid:
             sub_gs_list.append(sub_gs)
 
         for idx_pc in range(self._num_show_pc):
-            img_data = ScanWrapper(self._pc_folder_obj.get_file_path(idx_pc)).get_data()
-            self._plot_one_pc(img_data, sub_gs_list[idx_pc], f'PC{idx_pc+1}')
+            img_data_obj = ScanWrapper(self._pc_folder_obj.get_file_path(idx_pc))
+            img_data = img_data_obj.get_data()
+            img_name = os.path.basename(self._pc_folder_obj.get_file_path(idx_pc)).replace('.nii.gz', '')
+            logger.info(f'Reading image {self._pc_folder_obj.get_file_path(idx_pc)}')
+            self._plot_one_pc(img_data, sub_gs_list[idx_pc], f'{img_name}')
 
         # out_eps = out_png.replace('.png', '.eps')
         logger.info(f'Save fig to {out_png}')
@@ -62,17 +66,25 @@ class PlotPCGrid:
             step_size = view_config_list[idx_view]['step size'][0]
             for idx_clip in range(self._num_clip):
                 # logger.info(f'Plot view ({idx_clip, idx_view})')
-                clip_off_set = (idx_clip - 2) * step_size
+                # clip_off_set = (idx_clip - 2) * step_size
+                clip_off_set = 0
                 clip = self._clip_image(image_data, clip_plane, clip_off_set)
                 ax = plt.subplot(sub_gs[idx_clip + idx_view * self._num_clip, 0])
                 plt.axis('off')
-                plt.imshow(
+                im = plt.imshow(
                     clip,
                     interpolation='none',
                     cmap=self._cm,
                     norm=colors.Normalize(vmin=vmin, vmax=vmax)
                 )
-                ax.set_title(f'{title_prefix}_{idx_view}_{idx_clip}', fontsize=self._sub_title_font_size)
+                ax.set_title(f'{title_prefix}_{clip_plane}', fontsize=self._sub_title_font_size)
+
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+
+                cb = plt.colorbar(im, cax=cax)
+                # cb.set_label('Intensity of Eigen Image')
+                cb.ax.tick_params(labelsize=self._sub_title_font_size/2)
 
     def _get_view_config(self):
         view_config_list = [

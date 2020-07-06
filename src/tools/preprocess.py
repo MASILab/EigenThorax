@@ -1,7 +1,7 @@
 import os
 from tools.utils import read_file_contents_list, mkdir_p, convert_3d_2_flat, get_logger
 from tools.paral import AbstractParallelRoutine
-from tools.data_io import DataFolder, ScanWrapper
+from tools.data_io import DataFolder, ScanWrapper, ScanWrapperWithMask
 import numpy as np
 import time
 
@@ -187,7 +187,7 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
 class ScanFolderBatchReader(AbstractParallelRoutine):
     def __init__(self, config, in_folder, ref_img, batch_size, file_list_txt=None):
         super().__init__(config, in_folder, file_list_txt)
-        self._ref_img = ScanWrapper(ref_img)
+        self._ref_img = ScanWrapper(self._in_data_folder.get_file_path(0))
         self._chunk_list = self._in_data_folder.get_chunks_list_batch_size(batch_size)
         self._data_matrix = []
         self._cur_idx = 0
@@ -213,6 +213,9 @@ class ScanFolderBatchReader(AbstractParallelRoutine):
         out_path_ori = os.path.join(out_folder, f'pc_{idx}.nii.gz')
         self._ref_img.save_scan_same_space(data_array, out_path_ori)
 
+    def get_ref(self):
+        return self._ref_img
+
     def _run_single_scan(self, idx):
         in_file_path = self._in_data_folder.get_file_path(idx)
         in_data = ScanWrapper(in_file_path)
@@ -224,14 +227,43 @@ class ScanFolderBatchReader(AbstractParallelRoutine):
         self._cur_idx += 1
 
     def _init_data_matrix(self, num_sample):
-        num_features = self._ref_img.get_number_voxel()
-        # num_sample = self.num_files()
+        num_features = self._get_number_of_voxel()
 
         del self._data_matrix
         self._data_matrix = np.zeros((num_sample, num_features))
 
     def _reset_cur_idx(self):
         self._cur_idx = 0
+
+    def _get_number_of_voxel(self):
+        return self._ref_img.get_number_voxel()
+
+class ScanFolderBatchWithMaskReader(ScanFolderBatchReader):
+    def __init__(self, config, in_folder, mask_img, batch_size, file_list_txt):
+        super().__init__(config, in_folder, None, batch_size, file_list_txt)
+        self._mask_img = ScanWrapper(mask_img)
+        self._masked_ref = ScanWrapperWithMask(
+            self._in_data_folder.get_file_path(0),
+            self._mask_img.get_path()
+        )
+
+    def save_flat_data(self, data_array, idx, out_folder):
+        out_path = os.path.join(out_folder, f'pc_{idx}.nii.gz')
+
+        self._masked_ref.save_scan_flat_img(data_array, out_path)
+
+    def _run_single_scan(self, idx):
+        in_data = ScanWrapperWithMask(
+            self._in_data_folder.get_file_path(idx),
+            self._mask_img.get_path()
+        )
+
+        self._data_matrix[self._cur_idx, :] = in_data.get_data_flat()
+
+        self._cur_idx += 1
+
+    def _get_number_of_voxel(self):
+        return self._masked_ref.get_data_flat().shape[0]
 
 
 class ScanFolderConcatBatchReader(AbstractParallelRoutine):
@@ -273,8 +305,11 @@ class ScanFolderConcatBatchReader(AbstractParallelRoutine):
         ori_data_flat = data_array[:self._ref_ori.get_number_voxel()]
         jac_data_flat = data_array[self._ref_ori.get_number_voxel():]
 
-        self._ref_ori.save_scan_same_space(ori_data_flat, out_path_ori)
-        self._ref_jac.save_scan_same_space(jac_data_flat, out_path_jac)
+        self._ref_ori.save_scan_flat_img(ori_data_flat, out_path_ori)
+        self._ref_jac.save_scan_flat_img(jac_data_flat, out_path_jac)
+
+    def get_ref(self):
+        return self._ref_ori
 
     def _run_single_scan(self, idx):
         in_ori_data = ScanWrapper(self._in_data_folder.get_file_path(idx)).get_data()
@@ -286,13 +321,65 @@ class ScanFolderConcatBatchReader(AbstractParallelRoutine):
         self._cur_idx += 1
 
     def _init_data_matrix(self, num_sample):
-        num_features = self._ref_ori.get_number_voxel() + self._ref_jac.get_number_voxel()
+        num_features = self._get_number_of_voxel()
 
         del self._data_matrix
         self._data_matrix = np.zeros((num_sample, num_features))
 
+    def _get_number_of_voxel(self):
+        return self._get_number_of_voxel_ori() + self._get_number_of_voxel_jac()
+
+    def _get_number_of_voxel_ori(self):
+        return self._ref_ori.get_number_voxel()
+
+    def _get_number_of_voxel_jac(self):
+        return self._ref_jac.get_number_voxel()
+
     def _reset_cur_idx(self):
         self._cur_idx = 0
+
+
+class ScanFolderConcatBatchReaderWithMask(ScanFolderConcatBatchReader):
+    def __init__(self,
+                 mask_img_path,
+                 config,
+                 in_ori_folder,
+                 in_jac_folder,
+                 batch_size,
+                 file_list_txt=None):
+        super().__init__(config,
+                         in_ori_folder,
+                         in_jac_folder,
+                         batch_size,
+                         file_list_txt)
+        self._mask_img = ScanWrapper(mask_img_path)
+        self._masked_ref_ori = ScanWrapperWithMask(self._in_data_folder.get_file_path(0), self._mask_img.get_path())
+        self._masked_ref_jac = ScanWrapperWithMask(self._in_jac_folder.get_file_path(0), self._mask_img.get_path())
+
+    def save_flat_data(self, data_array, idx, out_folder):
+        out_path_ori = os.path.join(out_folder, f'pc_ori_{idx}.nii.gz')
+        out_path_jac = os.path.join(out_folder, f'pc_jac_{idx}.nii.gz')
+
+        ori_data_flat = data_array[:self._get_number_of_voxel_ori()]
+        jac_data_flat = data_array[self._get_number_of_voxel_ori():]
+
+        self._masked_ref_ori.save_scan_flat_img(ori_data_flat, out_path_ori)
+        self._masked_ref_jac.save_scan_flat_img(jac_data_flat, out_path_jac)
+
+    def _run_single_scan(self, idx):
+        in_ori_data_obj = ScanWrapperWithMask(self._in_data_folder.get_file_path(idx), self._mask_img.get_path())
+        in_jac_data_obj = ScanWrapperWithMask(self._in_jac_folder.get_file_path(idx), self._mask_img.get_path())
+
+        self._data_matrix[self._cur_idx, :self._get_number_of_voxel_ori()] = in_ori_data_obj.get_data_flat()
+        self._data_matrix[self._cur_idx, self._get_number_of_voxel_ori():] = in_jac_data_obj.get_data_flat()
+
+        self._cur_idx += 1
+
+    def _get_number_of_voxel_ori(self):
+        return self._masked_ref_ori.get_data_flat().shape[0]
+
+    def _get_number_of_voxel_jac(self):
+        return self._masked_ref_jac.get_data_flat().shape[0]
 
 
 class CalcJacobian(AbstractParallelRoutine):

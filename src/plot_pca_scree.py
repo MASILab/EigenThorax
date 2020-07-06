@@ -40,7 +40,7 @@ def main():
 
     plt.subplot(1, 2, 1)
     plt.plot(x, scree_array, 'ro-', linewidth=2)
-    plt.xticks(x[::2])
+    plt.xticks(x[::10] - 1)
     plt.xlabel('PCs')
     # plt.ylabel('Explained variance')
     plt.title('Scree plot')
@@ -48,7 +48,7 @@ def main():
     plt.subplot(1, 2, 2)
     plt.plot(x, scree_cumsum, 'bo-', linewidth=2)
     plt.xlabel('PCs')
-    plt.xticks(x[::2])
+    plt.xticks(x[::10] -1)
     # plt.ylabel('Cumulative explained variance')
     plt.title('Cumulative explained variance')
 

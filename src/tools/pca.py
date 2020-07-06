@@ -10,9 +10,12 @@ import numpy as np
 
 class PCA_Abstract:
     def __init__(self, scan_folder_reader, ref_img):
-        if ref_img:
-            self._ref_img = ScanWrapper(ref_img)
+        # if ref_img:
+        #     self._ref_img = ScanWrapper(ref_img)
         self._scan_folder_reader = scan_folder_reader
+        self._ref_img = None
+        if scan_folder_reader != None:
+            self._ref_img = scan_folder_reader.get_ref()
         self._pca = None
 
     def _set_pca(self, pca):
@@ -31,7 +34,9 @@ class PCA_Abstract:
         pc = self._pca.components_
         for idx_pc in range(n_components):
             pc_data_flat = pc[idx_pc, :]
-            self._scan_folder_reader.save_flat_data(pc_data_flat, idx_pc, out_folder)
+            self._scan_folder_reader.save_flat_data(pc_data_flat, idx_pc + 1, out_folder)
+        mean = self._pca.mean_
+        self._scan_folder_reader.save_flat_data(mean, 0, out_folder)
 
     def write_mean(self, out_path):
         print('Save mean', flush=True)
@@ -105,6 +110,8 @@ class PCA_NII_3D_Batch(PCA_Abstract):
             print(f'Batch done. Total time on pca: {toc_batch - tic_batch:0.4f} (s)', flush=True)
         toc_total = time.perf_counter()
         print(f'Incremental PCA done. Total time: {toc_total - tic_total:0.4f} (s)')
+
+
 
 
 

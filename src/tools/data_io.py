@@ -4,6 +4,8 @@ import nibabel as nib
 import numpy as np
 import pickle
 import pandas as pd
+import seaborn as sns
+
 
 logger = get_logger('DataFolder')
 
@@ -136,11 +138,48 @@ class ScanWrapper:
         self.save_scan_same_space(out_path, data_3d)
 
 
+class ScanWrapperWithMask(ScanWrapper):
+    def __init__(self, img_path, mask_path):
+        super().__init__(img_path)
+        self._mask = nib.load(mask_path)
+        self._mask_path = mask_path
+
+    def get_number_voxel(self):
+        mask_data = self._mask.get_data()
+        num_effective_voxel = np.sum(mask_data.flatten())
+
+        return num_effective_voxel
+
+    def get_data_flat(self):
+        img_data = self.get_data()
+        mask_data = self._mask.get_data()
+        img_data_flat = img_data[mask_data == 1]
+
+        return img_data_flat
+
+    def save_scan_flat_img(self, data_flat, out_path):
+        mask_data = self._mask.get_data()
+        img_data = np.zeros(mask_data.shape, dtype=float)
+
+        img_data[mask_data == 1] = data_flat
+
+        self.save_scan_same_space(out_path, img_data)
+
+
 class ClusterAnalysisDataDict:
     def __init__(self, data_dict, n_feature):
         self._data_dict = data_dict
         self._n_feature = n_feature
         self._df_field = self.get_df_field()
+
+    def save_bin_plot_field(self, field_flag, out_png_folder):
+        field_type = self._get_field_type(field_flag)
+        if field_type == 'Category':
+            self._save_bin_plot_field_category(field_flag)
+
+    def _save_bin_plot_field_category(self, field_flag):
+        sns.set(style="darkgrid")
+        ax = sns.countplot(x=field_flag, data=self._df_field)
 
     def get_df_field(self):
         df_field_ori = self._get_dataframe_from_data_dict()
@@ -280,6 +319,15 @@ class ClusterAnalysisDataDict:
 
         return label_list
 
+    @staticmethod
+    def _get_field_type(field_flag):
+        field_type = 'Unknown'
+        if (field_flag == 'copd') | (field_flag == 'COPD') | (field_flag == 'Coronary Artery Calcification') | (field_flag == 'CAC'):
+            field_type = 'Category'
+        else:
+            field_type = 'Continuous'
+
+        return field_type
 
     @staticmethod
     def _get_pc_str(idx):
