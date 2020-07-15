@@ -24,7 +24,7 @@ def main():
     scree_array_list = []
     scree_cumsum_list = []
 
-    x = None
+    max_len = 0
     for idx_model in range(num_models):
         logger.info(f'Loading model {model_name_list[idx_model]}')
         pca_nii_3d = PCA_NII_3D(None, None, 1)
@@ -34,8 +34,13 @@ def main():
         scree_array_list.append(scree_array)
         scree_cumsum_list.append(scree_cumsum)
 
-        if idx_model == 0:
-            x = np.arange(len(scree_array)) + 1
+        if len(scree_array) > max_len:
+            max_len = len(scree_array)
+
+        # if idx_model == 0:
+        #     x = np.arange(len(scree_array)) + 1
+
+    x = np.arange(max_len) + 1
 
     plt.figure(figsize=(30, 15))
 
@@ -47,8 +52,13 @@ def main():
     # Scree.
     ax1 = plt.subplot(1, 2, 1)
     for idx_model in range(num_models):
+        y_array = np.zeros((max_len,), dtype=float)
+        y_array.fill(np.nan)
+        model_scree_list = scree_array_list[idx_model]
+        y_array[:len(model_scree_list)] = model_scree_list
+
         ax1.plot(x,
-                 scree_array_list[idx_model],
+                 y_array,
                  marker='+',
                  linewidth=2,
                  label=model_name_list[idx_model])
@@ -61,8 +71,13 @@ def main():
     # Cumulative explained variance
     ax2 = plt.subplot(1, 2, 2)
     for idx_model in range(num_models):
+        y_array = np.zeros((max_len,), dtype=float)
+        y_array.fill(np.nan)
+        model_cumsum_list = scree_cumsum_list[idx_model]
+        y_array[:len(model_cumsum_list)] = model_cumsum_list
+
         ax2.plot(x,
-                 scree_cumsum_list[idx_model],
+                 y_array,
                  marker='+',
                  linewidth=2,
                  label=model_name_list[idx_model])

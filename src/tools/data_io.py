@@ -342,5 +342,6 @@ def save_object(object_to_save, file_path):
 
 def load_object(file_path):
     with open(file_path, 'rb') as input_file:
+        logger.info(f'Loading binary data from {file_path}')
         obj = pickle.load(input_file)
         return obj

@@ -22,6 +22,7 @@ def main():
                         help='Batch size')
     parser.add_argument('--save-pca-result-path', type=str,
                         help='Save the result to the given location')
+    parser.add_argument('--load-pca-obj-file-path', type=str)
 
     args = parser.parse_args()
 
@@ -37,10 +38,14 @@ def main():
     pca_nii_3d = PCA_NII_3D_Batch(scan_folder_reader,
                                   None,
                                   args.n_components)
-    pca_nii_3d.run_pca()
 
-    if args.save_pca_result_path:
-        pca_nii_3d.save_pca_obj(args.save_pca_result_path)
+    if args.load_pca_obj_file_path:
+        pca_nii_3d.load_pca(args.load_pca_obj_file_path)
+    else:
+        pca_nii_3d.run_pca()
+
+        if args.save_pca_result_path:
+            pca_nii_3d.save_pca_obj(args.save_pca_result_path)
 
     if args.out_pc_folder:
         mkdir_p(args.out_pc_folder)

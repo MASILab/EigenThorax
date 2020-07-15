@@ -60,6 +60,10 @@ class PlotPCGrid:
         range_norm = np.max([np.min(image_data), np.max(image_data)])
         vmin = - 0.5 * range_norm
         vmax = 0.5 * range_norm
+
+        # vmin = -8
+        # vmax = 1
+
         view_config_list = self._get_view_config()
         for idx_view in range(self._num_view):
             clip_plane = view_config_list[idx_view]['clip plane']

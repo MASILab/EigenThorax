@@ -32,20 +32,6 @@ OUT_PC_FOLDER=${PCA_ROOT}/pc
 OUT_PCA_BIN_PATH=${PCA_ROOT}/model.bin
 mkdir -p ${OUT_PC_FOLDER}
 
-set -o xtrace
-${PYTHON_ENV} ${SRC_ROOT}/src/run_pca_concat_with_mask.py \
-  --config ${CONFIG_YAML} \
-  --in-ori-folder ${IN_DATA_FOLDER} \
-  --in-jac-folder ${IN_JAC_FOLDER} \
-  --mask-img-path ${MASK_IMG} \
-  --in-file-list ${FILE_LIST} \
-  --out-pc-folder ${OUT_PC_FOLDER} \
-  --n-components "${N_COMPONENTS}" \
-  --batch-size "${BATCH_SIZE}" \
-  --save-pca-result-path ${OUT_PCA_BIN_PATH} \
-  --load-pca-obj-file-path ${OUT_PCA_BIN_PATH}
-set +o xtrace
-
 #set -o xtrace
 #${PYTHON_ENV} ${SRC_ROOT}/src/run_pca_concat_with_mask.py \
 #  --config ${CONFIG_YAML} \
@@ -56,8 +42,22 @@ set +o xtrace
 #  --out-pc-folder ${OUT_PC_FOLDER} \
 #  --n-components "${N_COMPONENTS}" \
 #  --batch-size "${BATCH_SIZE}" \
-#  --save-pca-result-path ${OUT_PCA_BIN_PATH}
+#  --save-pca-result-path ${OUT_PCA_BIN_PATH} \
+#  --load-pca-obj-file-path ${OUT_PCA_BIN_PATH}
 #set +o xtrace
+
+set -o xtrace
+${PYTHON_ENV} ${SRC_ROOT}/src/run_pca_concat_with_mask.py \
+  --config ${CONFIG_YAML} \
+  --in-ori-folder ${IN_DATA_FOLDER} \
+  --in-jac-folder ${IN_JAC_FOLDER} \
+  --mask-img-path ${MASK_IMG} \
+  --in-file-list ${FILE_LIST} \
+  --out-pc-folder ${OUT_PC_FOLDER} \
+  --n-components "${N_COMPONENTS}" \
+  --batch-size "${BATCH_SIZE}" \
+  --save-pca-result-path ${OUT_PCA_BIN_PATH}
+set +o xtrace
 
 echo "#####################"
 echo "# Step.4 Plot PCs and scree"
