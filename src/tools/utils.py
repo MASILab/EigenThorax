@@ -23,6 +23,12 @@ def read_file_contents_list(file_name):
         lines = [line.rstrip('\n') for line in file]
         return lines
 
+def save_file_contents_list(file_name, item_list):
+    print(f'Save list to file {file_name}')
+    print(f'Number items: {len(item_list)}')
+    with open(file_name, 'w') as file:
+        for item in item_list:
+            file.write(item + '\n')
 
 def write_list_to_file(file_list_data, out_path):
     print(f'Output file list to {out_path}', flush=True)
