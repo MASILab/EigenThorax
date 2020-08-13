@@ -7,6 +7,29 @@ import numpy as np
 import logging
 import sys
 
+loggers = {}
+
+def get_logger(name, level=logging.INFO):
+    global loggers
+    if loggers.get(name) is not None:
+        return loggers[name]
+    else:
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        # Logging to console
+        stream_handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            '%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s')
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+
+        loggers[name] = logger
+
+        return logger
+
+
+logger = get_logger('utils')
+
 
 def convert_3d_2_flat(in_data_matrix):
     num_voxel = np.prod(in_data_matrix.shape)
@@ -18,7 +41,7 @@ def convert_flat_2_3d(in_data_array, im_shape):
 
 
 def read_file_contents_list(file_name):
-    print(f'Reading from file list txt {file_name}', flush=True)
+    logger.info(f'Reading from file list txt {file_name}')
     with open(file_name) as file:
         lines = [line.rstrip('\n') for line in file]
         return lines
@@ -271,24 +294,3 @@ def get_interpolation_command(interp_type_name, bash_config, src_root, moving_im
 
     return command_list
 
-
-loggers = {}
-
-
-def get_logger(name, level=logging.INFO):
-    global loggers
-    if loggers.get(name) is not None:
-        return loggers[name]
-    else:
-        logger = logging.getLogger(name)
-        logger.setLevel(level)
-        # Logging to console
-        stream_handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            '%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s')
-        stream_handler.setFormatter(formatter)
-        logger.addHandler(stream_handler)
-
-        loggers[name] = logger
-
-        return logger
