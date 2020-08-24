@@ -12,22 +12,35 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 logger = get_logger('Gaussian fit')
 
 
-class FitGaussian:
+class FitGaussianJoint:
     def __init__(self):
-        self._in_data_matrix_obj = None
-        self._num_pc = None
+        self._in_res_matrix_obj = None
+        self._in_jac_matrix_obj = None
+        self._num_res_pc = None
+        self._num_jac_pc = None
         self._file_list = None
         self._use_data_matrix = None
         self._gaussian_model = None
 
-    def load_data(self, in_data_matrix_bin_path, num_pc):
-        logger.info(f'Load bin data file {in_data_matrix_bin_path}')
-        self._data_obj = load_object(in_data_matrix_bin_path)
+    def load_data(
+            self,
+            in_res_matrix_path,
+            num_res_pc,
+            in_jac_matrix_path,
+            num_jac_pc
+    ):
+        self._in_res_matrix_obj = load_object(in_res_matrix_path)
+        self._num_res_pc = num_res_pc
+        self._in_jac_matrix_obj = load_object(in_jac_matrix_path)
+        self._num_jac_pc = num_jac_pc
 
-        self._num_pc = num_pc
-        self._file_list = self._data_obj['file_list']
+        self._file_list = self._in_res_matrix_obj['file_list']
 
-        self._use_data_matrix = self._data_obj['projected_matrix'][:, :self._num_pc]
+        num_dim = num_res_pc + num_jac_pc
+        num_sample = self._in_res_matrix_obj['projected_matrix'].shape[0]
+        self._use_data_matrix = np.zeros((num_sample, num_dim))
+        self._use_data_matrix[:, :self._num_res_pc] = self._in_res_matrix_obj['projected_matrix'][:, :self._num_res_pc]
+        self._use_data_matrix[:, self._num_res_pc:num_dim] = self._in_jac_matrix_obj['projected_matrix'][:, :self._num_jac_pc]
 
     def fit_gaussian(self):
         """
@@ -96,48 +109,6 @@ class FitGaussian:
 
         return pd.DataFrame(list(zip(file_list, p_array, m_dist_array)), columns=['Scan', 'Probability', 'M-Distance'])
 
-    def plot_2d_distribution(self, out_png):
-        """
-        A testing function for simplified 2d case
-        :param out_png:
-        :return:
-        """
-        if self._num_pc != 2:
-            logger.info(f'2D plot require the number of pc equals to 2, current dimension is {self._num_pc}')
-            return
-
-        # 1. Get range
-        x_min = np.min(self._use_data_matrix[:, 0])
-        x_max = np.max(self._use_data_matrix[:, 0])
-        x_min, x_max = x_min - 0.05 * (x_max - x_min), x_max + 0.05 * (x_max - x_min)
-        y_min = np.min(self._use_data_matrix[:, 1])
-        y_max = np.max(self._use_data_matrix[:, 1])
-        y_min, y_max = y_min - 0.05 * (y_max - y_min), y_max + 0.05 * (y_max - y_min)
-        x, y = np.mgrid[x_min:x_max:100j, y_min:y_max:100j]
-        pos = np.dstack((x, y))
-
-        # 2. plot the distribution
-        fig, ax = plt.subplots()
-        im_contour = ax.contourf(x, y, self._gaussian_model.pdf(pos))
-
-        # 3. scatter plot the samples
-        ax.scatter(
-            self._use_data_matrix[:, 0],
-            self._use_data_matrix[:, 1],
-            marker='x',
-            c='r',
-            s=0.5
-        )
-
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-
-        cb = plt.colorbar(im_contour, cax=cax)
-        cb.set_label('PDF')
-
-        logger.info(f'Save plot to {out_png}')
-        plt.savefig(out_png, bbox_inches='tight', pad_inches=0)
-
 
 def main():
     """
@@ -148,22 +119,28 @@ def main():
     :return:
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--load-data-matrix-bin', type=str)
+    parser.add_argument('--load-res-data-matrix-bin', type=str)
+    parser.add_argument('--load-jac-data-matrix-bin', type=str)
+    parser.add_argument('--num-res-pc', type=int)
+    parser.add_argument('--num-jac-pc', type=int)
     parser.add_argument('--positive-list', type=str)
     parser.add_argument('--out-csv-cancer', type=str)
     parser.add_argument('--out-csv-all', type=str)
     # parser.add_argument('--out-png', type=str)
-    parser.add_argument('--num-pc', type=int)
+
     args = parser.parse_args()
 
-    fit_obj = FitGaussian()
-    fit_obj.load_data(args.load_data_matrix_bin, args.num_pc)
+    fit_obj = FitGaussianJoint()
+    fit_obj.load_data(
+        args.load_res_data_matrix_bin,
+        args.num_res_pc,
+        args.load_jac_data_matrix_bin,
+        args.num_jac_pc)
     fit_obj.get_distribution(
         read_file_contents_list(args.positive_list),
         args.out_csv_cancer
     )
     fit_obj.get_distribution_all(args.out_csv_all)
-    # fit_obj.plot_2d_distribution(args.out_png)
 
 
 if __name__ == '__main__':
