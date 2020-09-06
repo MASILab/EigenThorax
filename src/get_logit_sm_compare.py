@@ -8,6 +8,7 @@ from sklearn import metrics
 import statsmodels.api as sm
 from patsy.highlevel import dmatrices
 from statsmodels.iolib.summary import Summary, summary_params
+from os import path
 
 
 logger = get_logger('Logistic regression, plot')
@@ -15,8 +16,12 @@ logger = get_logger('Logistic regression, plot')
 
 class GetLogitResult:
     def __init__(self):
-        self.logit_model = None
-        self.logit_result = None
+        self.logit_model_linear = None
+        self.logit_result_linear = None
+        self.logit_model_quadratic = None
+        self.logit_result_quadratic = None
+        self.logit_model_third = None
+        self.logit_result_third = None
         self.data = None
         self.view_range_min = 1.
         self.view_range_max = 13.
@@ -25,8 +30,14 @@ class GetLogitResult:
         self.hist_num_bins = 10
 
     def fit_model(self, in_csv_1, in_csv_2, column_flag):
-        logger.info(f'Run logistic regression')
+        x, y = self.get_x_y_data(in_csv_1, in_csv_2, column_flag)
 
+        self.fit_model_intercept(x, y)
+        self.fit_model_linear(x, y)
+        self.fit_model_quadratic(x, y)
+        self.fit_model_third(x, y)
+
+    def get_x_y_data(self, in_csv_1, in_csv_2, column_flag):
         logger.info(f'Reading {in_csv_1}')
         rvs1 = pd.read_csv(in_csv_1)[column_flag].to_numpy()
         logger.info(f'Data length {len(rvs1)}')
@@ -42,6 +53,32 @@ class GetLogitResult:
         y[:len(rvs1)] = 0
         y[len(rvs1):] = 1
 
+        return x, y
+
+    def fit_model_intercept(self, x, y):
+        logger.info('Run logistic regression with intercept only')
+
+        self.data = {
+            'x': x,
+            'y': y
+        }
+
+        Y, X = dmatrices('y ~ 1', self.data)
+
+        self.logit_model_intercept = sm.Logit(Y, X)
+        self.logit_result_intercept = self.logit_model_intercept.fit()
+
+        data_range = np.max(x) - np.min(x)
+        self.view_range_min = np.min(x) - 0.05 * data_range
+        self.view_range_max = np.max(x) + 0.05 * data_range
+
+        self.show_regression_result(self.logit_result_intercept)
+
+    def fit_model_linear(self, x, y):
+        logger.info('Run first order logistic regression')
+
+        # x, y = self.get_x_y_data(in_csv_1, in_csv_2, column_flag)
+
         self.data = {
             'x': x,
             'y': y
@@ -49,15 +86,57 @@ class GetLogitResult:
 
         Y, X = dmatrices('y ~ x', self.data)
 
-        self.logit_model = sm.Logit(Y, X)
-        self.logit_result = self.logit_model.fit()
+        self.logit_model_linear = sm.Logit(Y, X)
+        self.logit_result_linear = self.logit_model_linear.fit()
 
         data_range = np.max(x) - np.min(x)
         self.view_range_min = np.min(x) - 0.05 * data_range
         self.view_range_max = np.max(x) + 0.05 * data_range
 
-        print(self.logit_result.summary())
-        print(f'Estimated params: {self.logit_result.params}')
+        self.show_regression_result(self.logit_result_linear)
+
+    def fit_model_quadratic(self, x, y):
+        logger.info('Run quadratic logistic regression')
+
+        self.data = {
+            'x': x,
+            'y': y
+        }
+
+        Y, X = dmatrices('y ~ x + np.power(x, 2)', self.data)
+
+        self.logit_model_quadratic = sm.Logit(Y, X)
+        self.logit_result_quadratic = self.logit_model_quadratic.fit()
+
+        data_range = np.max(x) - np.min(x)
+        self.view_range_min = np.min(x) - 0.05 * data_range
+        self.view_range_max = np.max(x) + 0.05 * data_range
+
+        self.show_regression_result(self.logit_result_quadratic)
+
+    def fit_model_third(self, x, y):
+        logger.info('Run quadratic logistic regression')
+
+        self.data = {
+            'x': x,
+            'y': y
+        }
+
+        Y, X = dmatrices('y ~ x + np.power(x, 2) + np.power(x, 3)', self.data)
+
+        self.logit_model_third = sm.Logit(Y, X)
+        self.logit_result_third = self.logit_model_third.fit()
+
+        data_range = np.max(x) - np.min(x)
+        self.view_range_min = np.min(x) - 0.05 * data_range
+        self.view_range_max = np.max(x) + 0.05 * data_range
+
+        self.show_regression_result(self.logit_result_third)
+
+    def show_regression_result(self, result_obj):
+        print(result_obj.summary())
+        print(f'Estimated params: {result_obj.params}')
+        print(f'AIC: {result_obj.aic}, BIC: {result_obj.bic}')
 
     def plot_result(self, out_png):
         fig, ax = plt.subplots(figsize=(18, 12))
@@ -116,6 +195,127 @@ class GetLogitResult:
         plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
+    def plot_order_compare_result(self, out_png):
+        fig, ax = plt.subplots(figsize=(18, 10))
+        gs = gridspec.GridSpec(1, 2)
+        gs.update(wspace=0.25, hspace=0.2)
+
+        ax_prob = plt.subplot(gs[0])
+        ax_odds = plt.subplot(gs[1])
+
+        view_range_min = self.view_range_min
+        view_range_max = self.view_range_max
+        step_size = (view_range_max - view_range_min) / 100
+        x_series = np.arange(start=view_range_min,
+                             stop=view_range_max,
+                             step=step_size)
+
+        # Plot prob
+        hist_info = self.plot_hist(ax_prob)
+        ax2_prob = ax_prob.twinx()
+        ax2_prob.set_ylabel('Probability')
+        self.plot_hist_bin_bubble_plot(hist_info, ax2_prob, 'prob')
+        self.plot_data_curve(
+            ax2_prob,
+            x_series,
+            self.get_y_series_with_order(x_series, 0, 'prob'),
+            'P ~ Logit(1)'
+        )
+        self.plot_data_curve(
+            ax2_prob,
+            x_series,
+            self.get_y_series_with_order(x_series, 1, 'prob'),
+            'P ~ Logit(1 + MH)'
+        )
+        self.plot_data_curve(
+            ax2_prob,
+            x_series,
+            self.get_y_series_with_order(x_series, 2, 'prob'),
+            'P ~ Logit(1 + MH + HM^2)'
+        )
+        self.plot_data_curve(
+            ax2_prob,
+            x_series,
+            self.get_y_series_with_order(x_series, 3, 'prob'),
+            'P ~ Logit(1 + MH + HM^2 + HM^3)'
+        )
+        ax2_prob.legend(loc=1)
+        ax2_prob.tick_params(axis='y')
+        ax2_prob.grid(b=True, linestyle='--')
+        ax2_prob.set_title('Logistic regression result (Probability)')
+
+        # Plot log_odds_ratio
+        hist_info = self.plot_hist(ax_odds)
+        ax2_odds = ax_odds.twinx()
+        ax2_odds.set_ylabel('Log odds ratio (Logit)')
+        self.plot_hist_bin_bubble_plot(hist_info, ax2_odds, 'log_odds_ratio')
+        self.plot_data_curve(
+            ax2_odds,
+            x_series,
+            self.get_y_series_with_order(x_series, 0, 'log_odds_ratio'),
+            'P ~ Logit(1)'
+        )
+        self.plot_data_curve(
+            ax2_odds,
+            x_series,
+            self.get_y_series_with_order(x_series, 1, 'log_odds_ratio'),
+            'P ~ Logit(1 + MH)'
+        )
+        self.plot_data_curve(
+            ax2_odds,
+            x_series,
+            self.get_y_series_with_order(x_series, 2, 'log_odds_ratio'),
+            'P ~ Logit(1 + MH + HM^2)'
+        )
+        self.plot_data_curve(
+            ax2_odds,
+            x_series,
+            self.get_y_series_with_order(x_series, 3, 'log_odds_ratio'),
+            'P ~ Logit(1 + MH + HM^2 + HM^3)'
+        )
+        ax2_odds.legend(loc=1)
+        ax2_odds.tick_params(axis='y')
+        ax2_odds.grid(b=True, linestyle='--')
+        ax2_odds.set_title('Logistic regression result (log odds ratio)')
+
+        logger.info(f'Save plot to {out_png}')
+        plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
+        plt.close()
+
+    def get_y_series_with_order(self, x_series, order, form_flag='prob'):
+        exp_term = None
+        if order == 0:
+            exp_term = np.zeros((100,), dtype=float)
+            exp_term[:] = self.logit_result_intercept.params[0]
+        elif order == 1:
+            x_series_with_intercept = np.zeros((100, 2), dtype=float)
+            x_series_with_intercept[:, 0] = 1.
+            x_series_with_intercept[:, 1] = x_series[:]
+            exp_term = np.dot(x_series_with_intercept, self.logit_result_linear.params)
+        elif order == 2:
+            x_series_with_intercept = np.zeros((100, 3), dtype=float)
+            x_series_with_intercept[:, 0] = 1.
+            x_series_with_intercept[:, 1] = x_series[:]
+            x_series_with_intercept[:, 2] = np.power(x_series[:], 2)
+            exp_term = np.dot(x_series_with_intercept, self.logit_result_quadratic.params)
+        elif order == 3:
+            x_series_with_intercept = np.zeros((100, 4), dtype=float)
+            x_series_with_intercept[:, 0] = 1.
+            x_series_with_intercept[:, 1] = x_series[:]
+            x_series_with_intercept[:, 2] = np.power(x_series[:], 2)
+            x_series_with_intercept[:, 3] = np.power(x_series[:], 3)
+            exp_term = np.dot(x_series_with_intercept, self.logit_result_third.params)
+        else:
+            raise NotImplementedError
+
+        y_series = None
+        if form_flag == 'prob':
+            y_series = self.logit_model_linear.cdf(exp_term)
+        elif form_flag == 'log_odds_ratio':
+            y_series = exp_term[:]
+
+        return y_series
+
     def plot_probability_curve(self, ax):
         hist_info = self.plot_hist(ax)
 
@@ -128,7 +328,7 @@ class GetLogitResult:
         x_series_with_intercept = np.zeros((100, 2), dtype=float)
         x_series_with_intercept[:, 0] = 1.
         x_series_with_intercept[:, 1] = x_series[:]
-        y_series = self.logit_model.cdf(np.dot(x_series_with_intercept, self.logit_result.params))
+        y_series = self.logit_model_linear.cdf(np.dot(x_series_with_intercept, self.logit_result_linear.params))
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -158,7 +358,7 @@ class GetLogitResult:
         x_series_with_intercept = np.zeros((100, 2), dtype=float)
         x_series_with_intercept[:, 0] = 1.
         x_series_with_intercept[:, 1] = x_series[:]
-        y_series = np.exp(np.dot(x_series_with_intercept, self.logit_result.params))
+        y_series = np.exp(np.dot(x_series_with_intercept, self.logit_result_linear.params))
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -185,7 +385,7 @@ class GetLogitResult:
         x_series_with_intercept = np.zeros((100, 2), dtype=float)
         x_series_with_intercept[:, 0] = 1.
         x_series_with_intercept[:, 1] = x_series[:]
-        y_series = np.dot(x_series_with_intercept, self.logit_result.params)
+        y_series = np.dot(x_series_with_intercept, self.logit_result_linear.params)
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -200,6 +400,7 @@ class GetLogitResult:
         )
         ax2.tick_params(axis='y', labelcolor=color)
         ax2.grid(b=True, color=color, linestyle='--')
+
 
     def plot_hist(self, ax):
         x = self.data['x']
@@ -239,8 +440,20 @@ class GetLogitResult:
 
         s = hist_value_array[0]
 
-        ax.scatter(x, y, s=3*s, c=self.color_val_ax, alpha=0.5, edgecolors=self.color_val_ax, label='Observed')
+        ax.scatter(x, y,
+                   s=3*s,
+                   c=self.color_val_ax,
+                   alpha=0.5,
+                   edgecolors=self.color_val_ax,
+                   label=f'Observed ({len(hist_bin_boundary_array) - 1} bins)')
         # ax.scatter(x, y, c=self.color_val_ax)
+
+    def plot_data_curve(self, ax, x_series, y_series, label_str):
+        ax.plot(
+            x_series,
+            y_series,
+            label=label_str
+        )
 
     def plot_confidence_band(self, ax, x_series, data_flag):
         logger.info(f'Start to calculate odds ratio confidence band of {data_flag}')
@@ -359,17 +572,17 @@ class GetLogitResult:
         elif data_flag == 'odds_ratio':
             y_series = np.exp(np.dot(x_series_with_intercept, param_list))
         elif data_flag == 'prob':
-            y_series = self.logit_model.cdf(np.dot(x_series_with_intercept, param_list))
+            y_series = self.logit_model_linear.cdf(np.dot(x_series_with_intercept, param_list))
         else:
             raise NotImplementedError
 
         return y_series
 
     def get_parameter_summary(self):
-        print(summary_params(self.logit_result).data)
+        print(summary_params(self.logit_result_linear).data)
 
     def get_confidence_interval(self):
-        summary_data = summary_params(self.logit_result).data
+        summary_data = summary_params(self.logit_result_linear).data
         intercept_range = [float(summary_data[1][5]), float(summary_data[1][6])]
         slope_range = [float(summary_data[2][5]), float(summary_data[2][6])]
 
@@ -384,16 +597,20 @@ def main():
     parser.add_argument('--in-csv-1', type=str)
     parser.add_argument('--in-csv-2', type=str)
     parser.add_argument('--column-flag', type=str)
-    parser.add_argument('--out-png', type=str)
+    parser.add_argument('--out-folder', type=str)
     args = parser.parse_args()
 
     logit_obj = GetLogitResult()
     logit_obj.fit_model(args.in_csv_1, args.in_csv_2, args.column_flag)
+
     # logit_obj.plot_result_with_density_estimate(args.out_png)
     # logit_obj.plot_result(args.out_png)
-    logit_obj.plot_result_prob_only(args.out_png)
+    # logit_obj.plot_result_prob_only(args.out_png)
     # logit_obj.get_parameter_summary()
     # logit_obj.get_confidence_interval()
+
+    out_png_compare_result = path.join(args.out_folder, 'order_compare.png')
+    logit_obj.plot_order_compare_result(out_png_compare_result)
 
 
 if __name__ == '__main__':

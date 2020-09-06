@@ -47,7 +47,7 @@ class GetLogitResult:
             'y': y
         }
 
-        Y, X = dmatrices('y ~ x', self.data)
+        Y, X = dmatrices('y ~ x + np.power(x, 2)', self.data)
 
         self.logit_model = sm.Logit(Y, X)
         self.logit_result = self.logit_model.fit()
@@ -116,19 +116,33 @@ class GetLogitResult:
         plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
-    def plot_probability_curve(self, ax):
-        hist_info = self.plot_hist(ax)
-
+    def get_x_y_series(self, data_flag):
         view_range_min = self.view_range_min
         view_range_max = self.view_range_max
         step_size = (view_range_max - view_range_min) / 100
         x_series = np.arange(start=view_range_min,
                              stop=view_range_max,
                              step=step_size)
-        x_series_with_intercept = np.zeros((100, 2), dtype=float)
+        x_series_with_intercept = np.zeros((100, 3), dtype=float)
         x_series_with_intercept[:, 0] = 1.
         x_series_with_intercept[:, 1] = x_series[:]
-        y_series = self.logit_model.cdf(np.dot(x_series_with_intercept, self.logit_result.params))
+        x_series_with_intercept[:, 2] = np.power(x_series, 2)
+        y_series = None
+        p = self.logit_model.cdf(np.dot(x_series_with_intercept, self.logit_result.params))
+        if data_flag == 'prob':
+            y_series = p
+        elif data_flag == 'odds_ratio':
+            y_series = p / (1. - p)
+        elif data_flag == 'log_odds_ratio':
+            y_series = np.log(p / (1. - p))
+        else:
+            raise NotImplementedError
+
+        return x_series, y_series
+
+    def plot_probability_curve(self, ax):
+        hist_info = self.plot_hist(ax)
+        x_series, y_series = self.get_x_y_series('prob')
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -138,27 +152,14 @@ class GetLogitResult:
         ax2.plot(
             x_series,
             y_series,
-            color=color,
-            label='Predicted'
+            color=color
         )
-        ax2.legend(loc=1)
         ax2.tick_params(axis='y', labelcolor=color)
         ax2.grid(b=True, color=color, linestyle='--')
-        ax2.set_title('Logistic regression: P ~ logit(1 + MH)')
 
     def plot_odds_ratio(self, ax):
         hist_info = self.plot_hist(ax)
-
-        view_range_min = self.view_range_min
-        view_range_max = self.view_range_max
-        step_size = (view_range_max - view_range_min) / 100
-        x_series = np.arange(start=view_range_min,
-                             stop=view_range_max,
-                             step=step_size)
-        x_series_with_intercept = np.zeros((100, 2), dtype=float)
-        x_series_with_intercept[:, 0] = 1.
-        x_series_with_intercept[:, 1] = x_series[:]
-        y_series = np.exp(np.dot(x_series_with_intercept, self.logit_result.params))
+        x_series, y_series = self.get_x_y_series('odds_ratio')
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -175,17 +176,7 @@ class GetLogitResult:
 
     def plot_log_odds_ratio(self, ax):
         hist_info = self.plot_hist(ax)
-
-        view_range_min = self.view_range_min
-        view_range_max = self.view_range_max
-        step_size = (view_range_max - view_range_min) / 100
-        x_series = np.arange(start=view_range_min,
-                             stop=view_range_max,
-                             step=step_size)
-        x_series_with_intercept = np.zeros((100, 2), dtype=float)
-        x_series_with_intercept[:, 0] = 1.
-        x_series_with_intercept[:, 1] = x_series[:]
-        y_series = np.dot(x_series_with_intercept, self.logit_result.params)
+        x_series, y_series = self.get_x_y_series('log_odds_ratio')
 
         ax2 = ax.twinx()
         color = 'tab:orange'
@@ -239,7 +230,7 @@ class GetLogitResult:
 
         s = hist_value_array[0]
 
-        ax.scatter(x, y, s=3*s, c=self.color_val_ax, alpha=0.5, edgecolors=self.color_val_ax, label='Observed')
+        ax.scatter(x, y, s=5*s, c=self.color_val_ax, alpha=0.5, edgecolors=self.color_val_ax)
         # ax.scatter(x, y, c=self.color_val_ax)
 
     def plot_confidence_band(self, ax, x_series, data_flag):
@@ -389,9 +380,9 @@ def main():
 
     logit_obj = GetLogitResult()
     logit_obj.fit_model(args.in_csv_1, args.in_csv_2, args.column_flag)
-    # logit_obj.plot_result_with_density_estimate(args.out_png)
+    logit_obj.plot_result_with_density_estimate(args.out_png)
     # logit_obj.plot_result(args.out_png)
-    logit_obj.plot_result_prob_only(args.out_png)
+    # logit_obj.plot_result_prob_only(args.out_png)
     # logit_obj.get_parameter_summary()
     # logit_obj.get_confidence_interval()
 
