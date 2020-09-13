@@ -72,6 +72,24 @@ class FitGaussian:
         logger.info(f'Save distribution of all files to {out_csv}')
         df.to_csv(out_csv, index=False)
 
+    def get_distribution_non_cancer(
+            self,
+            out_csv,
+            positive_list
+    ):
+        negative_list = [file_name for file_name in self._file_list if file_name not in positive_list]
+        logger.info(f'Number of positive: {len(positive_list)}')
+        logger.info(f'Number of overall: {len(self._file_list)}')
+        logger.info(f'Number of negative: {len(negative_list)}')
+
+        missing_file = [file_name for file_name in positive_list if file_name not in self._file_list]
+        logger.info(f'Number of missing file: {len(missing_file)}')
+        print(missing_file)
+
+        df = self.get_distribution_file_list(negative_list)
+        logger.info(f'Save distribution of non-cancer to {out_csv}')
+        df.to_csv(out_csv, index=False)
+
     def get_distribution_file_list(
             self,
             file_list
@@ -152,6 +170,7 @@ def main():
     parser.add_argument('--positive-list', type=str)
     parser.add_argument('--out-csv-cancer', type=str)
     parser.add_argument('--out-csv-all', type=str)
+    parser.add_argument('--out-csv-non-cancer', type=str)
     # parser.add_argument('--out-png', type=str)
     parser.add_argument('--num-pc', type=int)
     args = parser.parse_args()
@@ -162,7 +181,13 @@ def main():
         read_file_contents_list(args.positive_list),
         args.out_csv_cancer
     )
-    fit_obj.get_distribution_all(args.out_csv_all)
+    fit_obj.get_distribution_all(
+        args.out_csv_all
+    )
+    fit_obj.get_distribution_non_cancer(
+        args.out_csv_non_cancer,
+        read_file_contents_list(args.positive_list)
+    )
     # fit_obj.plot_2d_distribution(args.out_png)
 
 

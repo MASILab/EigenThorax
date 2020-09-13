@@ -132,3 +132,8 @@ class ClinicalDataReaderSPORE:
     @staticmethod
     def create_spore_data_reader_xlsx(file_xlsx):
         return ClinicalDataReaderSPORE(pd.read_excel(file_xlsx))
+
+    @staticmethod
+    def get_subject_list(file_list):
+        subject_id_list = list(set([ClinicalDataReaderSPORE._get_subject_id_from_file_name(file_name) for file_name in file_list]))
+        return subject_id_list

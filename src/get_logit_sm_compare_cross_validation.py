@@ -18,7 +18,7 @@ import uncertainties as unc
 logger = get_logger('Logistic regression, plot')
 
 
-class GetLogitResult:
+class GetLogitResultCrossValidation:
     def __init__(self):
         self.logit_model_linear = None
         self.logit_result_linear = None
@@ -31,8 +31,7 @@ class GetLogitResult:
         self.view_range_max = 13.
         self.band_sample_size = 50
         self.color_val_ax = 'tab:orange'
-        self.hist_num_bins = 8
-        self.exclude_percentile = 95
+        self.hist_num_bins = 10
 
     def fit_model(self, in_csv_positive, in_csv_negative, column_flag):
         x, y = self.get_x_y_data(in_csv_positive, in_csv_negative, column_flag)
@@ -56,19 +55,16 @@ class GetLogitResult:
         y[:len(rvs_pos)] = 1
         y[len(rvs_pos):] = 0
 
-        exclude_threshold = np.percentile(x, self.exclude_percentile)
+        exclude_threshold = np.percentile(x, 97.5)
         print(f'The 97.5 percentile of x: {exclude_threshold}')
         print(f'Number of scans: {len(x[x > exclude_threshold])}')
-
-        x_use = x[x <= exclude_threshold]
-        y_use = y[x <= exclude_threshold]
 
         self.data = {
             'x': x[x <= exclude_threshold],
             'y': y[x <= exclude_threshold]
         }
 
-        return x_use, y_use
+        return x, y
 
     def fit_model_intercept(self, x, y):
         logger.info('Run logistic regression with intercept only')
@@ -243,7 +239,7 @@ class GetLogitResult:
         # Plot prob
         hist_info = self.plot_hist(ax_prob)
         ax2_prob = ax_prob.twinx()
-        ax2_prob.set_ylabel('Cancer probability')
+        ax2_prob.set_ylabel('Probability')
         self.plot_hist_bin_bubble_plot(hist_info, ax2_prob, 'prob')
         self.plot_data_curve(
             ax2_prob,
@@ -346,7 +342,7 @@ class GetLogitResult:
         # Plot prob
         hist_info = self.plot_hist(ax_prob)
         ax2_prob = ax_prob.twinx()
-        ax2_prob.set_ylabel('Cancer probability')
+        ax2_prob.set_ylabel('Probability')
         self.plot_hist_bin_bubble_plot(hist_info, ax2_prob, 'prob')
         self.plot_confidence_band_with_cov(
             ax2_prob,
@@ -364,7 +360,7 @@ class GetLogitResult:
         ax2_prob.legend(loc=1)
         ax2_prob.tick_params(axis='y')
         ax2_prob.grid(b=True, linestyle='--')
-        ax2_prob.set_title(f'Logistic regression result in cancer probability scale\n {self.get_title_for_order(order)}')
+        ax2_prob.set_title(f'Logistic regression result in probability (cancer) scale\n {self.get_title_for_order(order)}')
         ax2_prob.set_ylim(-0.01, 0.17)
 
         # Plot Log odds ratio
