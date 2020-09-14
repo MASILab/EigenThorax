@@ -57,7 +57,7 @@ class GetLogitResult:
         y[len(rvs_pos):] = 0
 
         exclude_threshold = np.percentile(x, self.exclude_percentile)
-        print(f'The 97.5 percentile of x: {exclude_threshold}')
+        print(f'The {self.exclude_percentile} percentile of x: {exclude_threshold}')
         print(f'Number of scans: {len(x[x > exclude_threshold])}')
 
         x_use = x[x <= exclude_threshold]
