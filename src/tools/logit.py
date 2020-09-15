@@ -18,6 +18,7 @@ from scipy.spatial.distance import mahalanobis
 from tools.data_io import load_object
 from tools.cross_validation import get_idx_list_array_n_fold_cross_validation
 from tools.data_io import save_object
+from tools.PLCOm2012 import get_PLCOm2012_score
 
 
 logger = get_logger('Logit with cross-validation')
@@ -178,36 +179,62 @@ class LogitSingleFold:
         :param validation_y:
         :return:
         validation result summary
-        summary_each_order = {
-            'fpr':
-            'tpr':
-            'precision':
-            'recall':
-            'AUC-ROC':
-            'AUC-PR-Curve'
-        }
         """
         validation_summary = []
         for idx_order in range(4):
             predicted_y = self.get_y_series_with_order(validation_x, idx_order, 'prob')
-            fpr, tpr, _ = metrics.roc_curve(validation_y, predicted_y, pos_label=1)
-            precision, recall, _ = metrics.precision_recall_curve(validation_y, predicted_y, pos_label=1)
-            roc_auc = metrics.roc_auc_score(validation_y, predicted_y)
-            prc_auc = metrics.auc(recall, precision)
-
-            summary_item = {
-                'order': idx_order,
-                'fpr': fpr,
-                'tpr': tpr,
-                'precision': precision,
-                'recall': recall,
-                'roc_auc': roc_auc,
-                'prc_auc': prc_auc
-            }
-
+            summary_item = LogitSingleFold.get_validation_statics(validation_y, predicted_y)
             validation_summary.append(summary_item)
 
         return validation_summary
+
+    @staticmethod
+    def get_validation_statics(label, predicted_prob):
+        fpr, tpr, _ = metrics.roc_curve(label, predicted_prob, pos_label=1)
+        precision, recall, _ = metrics.precision_recall_curve(label, predicted_prob, pos_label=1)
+        roc_auc = metrics.roc_auc_score(label, predicted_prob)
+        prc_auc = metrics.auc(recall, precision)
+
+        summary_item = {
+            'fpr': fpr,
+            'tpr': tpr,
+            'precision': precision,
+            'recall': recall,
+            'roc_auc': roc_auc,
+            'prc_auc': prc_auc,
+            'label': label,
+            'pred': predicted_prob
+        }
+
+        return summary_item
+
+    @staticmethod
+    def get_mean_validation_statics_for_cv_array(valid_result_array):
+        label = []
+        pred = []
+
+        for valid_result in valid_result_array:
+            label.append(valid_result['label'])
+            pred.append(valid_result['pred'])
+
+        label = np.concatenate(label)
+        pred = np.concatenate(pred)
+
+        fpr, tpr, _ = metrics.roc_curve(label, pred, pos_label=1)
+        precision, recall, _ = metrics.precision_recall_curve(label, pred, pos_label=1)
+        roc_auc = metrics.roc_auc_score(label, pred)
+        prc_auc = metrics.auc(recall, precision)
+
+        summary_item = {
+            'fpr': fpr,
+            'tpr': tpr,
+            'precision': precision,
+            'recall': recall,
+            'roc_auc': roc_auc,
+            'prc_auc': prc_auc,
+            'label': label,
+            'pred': pred
+        }
 
 
 class GetGaussianFitSingleFold:
@@ -263,6 +290,7 @@ class GetLogitResultCrossValidation:
         self.gaussian_fit_obj_fold_array = []
         self.logit_model_obj_fold_array = []
         self.validation_result_fold_array = []
+        self.PLCOm2012_validation = None
 
     def load_data_single(self, in_feature_matrix_bin_path, num_pc):
         """
@@ -345,14 +373,36 @@ class GetLogitResultCrossValidation:
     def plot_auc_roc_with_CI(self, out_png):
         fig, ax = plt.subplots(figsize=(18, 12))
 
-        self._plot_auc_roc_with_CI_logit_order(ax, 1)
+        self._plot_auc_roc_with_CI_logit_order(ax, 1, 'Logistic Regression ROC')
 
         logger.info(f'Save plot to {out_png}')
         plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
-    def _plot_auc_roc_with_CI_logit_order(self, ax, order_flag):
-        logger.info(f'Plot AUC-ROC ({self.num_fold}-fold cross-validation) for logit model with order {order_flag}')
+    def plot_auc_roc_with_CI_4_order(self, out_png):
+        fig, ax = plt.subplots(figsize=(18, 12))
+        gs = gridspec.GridSpec(2, 2)
+        gs.update(wspace=0.25, hspace=0.2)
+
+        self._plot_auc_roc_with_CI_logit_order(plt.subplot(gs[0]), 0, 'Logistic Regression ROC - Null Model')
+        self._plot_auc_roc_with_CI_logit_order(plt.subplot(gs[1]), 1, 'Logistic Regression ROC - P ~ logit(1 + MH)')
+        self._plot_auc_roc_with_CI_logit_order(plt.subplot(gs[2]), 2, 'Logistic Regression ROC - P ~ logit(1 + MH + MH^2)')
+        self._plot_auc_roc_with_CI_logit_order(plt.subplot(gs[3]), 3, 'Logistic Regression ROC - P ~ logit(1 + MH + MH^2 + MH^3)')
+
+        logger.info(f'Save plot to {out_png}')
+        plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
+        plt.close()
+
+    def get_PLCOm2012_validation_statics(self):
+        logger.info('Validation with PLCOm2012')
+        PLCOm2012_pred, valid_idx_list = get_PLCOm2012_score(self.file_list)
+        valid_label_list = [self.label_list[idx] for idx in valid_idx_list]
+        validation_summary = LogitSingleFold.get_validation_statics(valid_label_list, PLCOm2012_pred)
+        self.PLCOm2012_validation = validation_summary
+        return validation_summary
+
+    def _plot_auc_roc_with_CI_logit_order(self, ax, order_flag, title_str):
+
         ax.plot([0, 1], [0, 1], linestyle='--', color='b', lw=2, label='No skill', alpha=0.8)
 
         fpr_array = [valid_result[order_flag]['fpr'] for valid_result in self.validation_result_fold_array]
@@ -371,19 +421,79 @@ class GetLogitResultCrossValidation:
 
         # plot ROC of each fold
         for idx_fold in range(self.num_fold):
-            ax.plot(fpr_array[idx_fold], tpr_array[idx_fold], lw=1, label=f'Fold {idx_fold+1} (AUC = {auc_array[idx_fold]:.2f})', alpha=0.3)
+            ax.plot(fpr_array[idx_fold], tpr_array[idx_fold], lw=1, label=f'Fold {idx_fold+1} (AUC = {auc_array[idx_fold]:.3f})', alpha=0.3)
 
         # plot mean
-        ax.plot(mean_fpr, mean_tpr, lw=2, label=f'Mean ROC (AUC = {mean_auc:.2f} $\pm$ {std_auc:.2f})')
+        ax.plot(mean_fpr, mean_tpr, color='r', lw=2, label=f'Mean ROC (AUC = {mean_auc:.3f} $\pm$ {std_auc:.3f})')
+
+        # plot baseline
+        PLCOm2012_summary = self.PLCOm2012_validation
+        PLCOm2012_auc_roc = PLCOm2012_summary['roc_auc']
+        ax.plot(PLCOm2012_summary['fpr'], PLCOm2012_summary['tpr'], color='g', lw=2, label=f'PLCOm2012 (AUC = {PLCOm2012_auc_roc:.3f})')
 
         # plot std
-        ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,
-                        label=r'$\pm$ 1 std. dev.')
+        # ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,
+        #                 label=r'$\pm$ 1 std. dev.')
+
+        logger.info(f'Plot AUC-ROC ({self.num_fold}-fold cross-validation) for logit model with order {order_flag}')
 
         ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05])
         ax.set_xlabel('False Positive Rate')
         ax.set_ylabel('True Positive Rate')
+        ax.set_title(title_str)
 
+        ax.legend(loc='best')
+
+    def plot_auc_prc_with_CI(self, out_png):
+        fix, ax = plt.subplots(figsize=(18, 12))
+
+        self._plot_auc_prc_with_CI_logit_order(ax, 1, 'Logistic Regression - PR-Curve')
+
+        logger.info(f'Save plot to {out_png}')
+        plt.savefig(out_png, bbox_inches='tight', pad_inches=0.1)
+        plt.close()
+
+    def _plot_auc_prc_with_CI_logit_order(self, ax, order_flag, title_str):
+        no_skill_val = len(self.label_list[self.label_list==1]) / len(self.label_list)
+        ax.plot([0, 1], [no_skill_val, no_skill_val], linestyle='--', color='b', lw=2, label=f'No skill ({no_skill_val:.3f})', alpha=0.8)
+
+        precision_array = [valid_result[order_flag]['precision'] for valid_result in self.validation_result_fold_array]
+        recall_array = [valid_result[order_flag]['recall'] for valid_result in self.validation_result_fold_array]
+
+        mean_recall = np.linspace(0, 1, 100)
+        mean_precision, std_precision = self._get_mean_std_with_interp(recall_array, precision_array, mean_recall)
+
+        print(mean_precision[:10])
+
+        precision_upper = mean_precision + std_precision
+        precision_lower = mean_precision - std_precision
+
+        mean_auc = metrics.auc(mean_precision, mean_recall)
+        auc_array = [valid_result[order_flag]['prc_auc'] for valid_result in self.validation_result_fold_array]
+        std_auc = np.std(np.array(auc_array))
+
+        # plot PR-Curve of each fold
+        for idx_fold in range(self.num_fold):
+            ax.plot(recall_array[idx_fold], precision_array[idx_fold], lw=1, label=f'Fold {idx_fold+1} (AUC = {auc_array[idx_fold]:.3f})', alpha=0.3)
+
+        # plot mean
+        ax.plot(mean_recall, mean_precision, color='r', lw=2, label=f'Mean ROC (AUC = {mean_auc:.3f} $\pm$ {std_auc:.3f})')
+
+        # plot baseline
+        PLCOm2012_summary = self.PLCOm2012_validation
+        PLCOm2012_auc_roc = PLCOm2012_summary['prc_auc']
+        ax.plot(PLCOm2012_summary['recall'], PLCOm2012_summary['precision'], color='g', lw=2, label=f'PLCOm2012 (AUC = {PLCOm2012_auc_roc:.3f})')
+
+        # plot std
+        ax.fill_between(mean_recall, precision_lower, precision_upper, color='grey', alpha=.2,
+                        label=r'$\pm$ 1 std. dev.')
+
+        logger.info(f'Plot PR-Curve ({self.num_fold}-fold cross-validation) for logit model with order {order_flag}')
+
+        ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05])
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_title(title_str)
         ax.legend(loc='best')
 
     def _get_mean_std_with_interp(self, x_fold_array, y_fold_array, sample_pts):
@@ -391,6 +501,8 @@ class GetLogitResultCrossValidation:
         for idx_fold in range(len(x_fold_array)):
             x_fold = x_fold_array[idx_fold]
             y_fold = y_fold_array[idx_fold]
+            print(x_fold[:3])
+            print(y_fold[:3])
             interp_y_list[idx_fold] = np.interp(sample_pts, x_fold, y_fold)
 
         mean_y = np.mean(interp_y_list, axis=0)

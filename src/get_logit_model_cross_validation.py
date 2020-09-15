@@ -1,7 +1,6 @@
 import argparse
 from os import path
 from tools.logit import GetLogitResultCrossValidation
-from tools.data_io import save_object
 
 
 def main():
@@ -20,12 +19,28 @@ def main():
     gaussian_logit_model_cv_obj.get_gaussian_fit_model_fold()
     gaussian_logit_model_cv_obj.get_logit_model_fold()
     gaussian_logit_model_cv_obj.get_validation_result()
+    gaussian_logit_model_cv_obj.get_PLCOm2012_validation_statics()
 
     # out_obj_bin = path.join(args.out_folder, 'cv_data.bin')
     # gaussian_logit_model_cv_obj.save_validation_result_to_bin(out_obj_bin)
 
-    out_png_roc_auc = path.join(args.out_folder, 'roc_auc.png')
+    out_png_roc_auc = path.join(args.out_folder, 'roc_auc_linear.png')
     gaussian_logit_model_cv_obj.plot_auc_roc_with_CI(out_png_roc_auc)
+
+    # out_png_order_compare = path.join(args.out_folder, 'roc_auc_order_compare.png')
+    # gaussian_logit_model_cv_obj.plot_auc_roc_with_CI_4_order(out_png_order_compare)
+
+    out_png_prc_auc = path.join(args.out_folder, 'prc_auc_linear.png')
+    gaussian_logit_model_cv_obj.plot_auc_prc_with_CI(out_png_prc_auc)
+
+    # out_png_order_compare = path.join(args.out_folder, 'roc_auc_order_compare.png')
+    # gaussian_logit_model_cv_obj.plot_auc_roc_with_CI_4_order(out_png_order_compare)
+
+    # PLCOm2012_validation_result = gaussian_logit_model_cv_obj.get_PLCOm2012_validation_statics()
+    # PLCOm2012_roc_auc = PLCOm2012_validation_result['roc_auc']
+    # PLCOm2012_prc_auc = PLCOm2012_validation_result['prc_auc']
+    # print(f'auc_roc = {PLCOm2012_roc_auc}')
+    # print(f'auc_prc = {PLCOm2012_prc_auc}')
 
 
 if __name__ == '__main__':
