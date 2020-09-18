@@ -11,13 +11,14 @@ logger = get_logger('DataFolder')
 
 
 class DataFolder:
-    def __init__(self, in_folder, data_file_list=None):
+    def __init__(self, in_folder, file_list=None):
         self._in_folder = in_folder
         self._file_list = []
         if data_file_list is None:
             self._file_list = self._get_file_list_in_folder(in_folder)
         else:
-            self._file_list = self._get_file_list(data_file_list)
+            # self._file_list = self._get_file_list(data_file_list)
+            self._file_list = file_list
         self._suffix = '.nii.gz'
 
     def get_folder(self):

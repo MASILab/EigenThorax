@@ -38,26 +38,28 @@ def PLCOm2012(age, race, education, body_mass_index, copd, phist, fhist,
     return res
 
 def _get_PLCOm2012_score_csv():
-    df = pd.read_csv('/nfs/masi/SPORE/file/clinical/self_creat/Limitedhistory20200420.csv', index_col='sess')
-    plco_list = []
-    for i, item in df.iterrows():
-        if item['age'] == item['age'] and item['race'] == item['race'] and item['education'] == item['education'] and \
-                item['bmi'] == item['bmi'] and item['copd'] == item['copd'] and item['phist'] == item['phist'] and item[
-            'fhist'] == item['fhist'] and item['smo_status'] == item['smo_status'] and item['smo_intensity'] == item[
-            'smo_intensity'] and item['duration'] == item['duration'] and item['quit_time'] == item['quit_time']:
-            plco = PLCOm2012(age=item['age'], race=item['race'], education=item['education'],
-                             body_mass_index=item['bmi'], copd=item['copd'], phist=item['phist'], fhist=item['fhist'],
-                             smoking_status=item['smo_status'], smoking_intensity=item['smo_intensity'],
-                             duration=item['duration'], quit_time=item['quit_time'])
-            plco_list.append(plco)
-        else:
-            plco_list.append('')
-    df['plco'] = plco_list
+    # df = pd.read_csv('/nfs/masi/SPORE/file/clinical/self_creat/Limitedhistory20200420.csv', index_col='sess')
+    df = pd.read_csv('/nfs/masi/xuk9/SPORE/clustering/registration/20200512_corrField/male/clinical/label_full.csv', index_col='id')
+    # plco_list = []
+    # for i, item in df.iterrows():
+    #     if item['age'] == item['age'] and item['race'] == item['race'] and item['education'] == item['education'] and \
+    #             item['bmi'] == item['bmi'] and item['copd'] == item['copd'] and item['phist'] == item['phist'] and item[
+    #         'fhist'] == item['fhist'] and item['smo_status'] == item['smo_status'] and item['smo_intensity'] == item[
+    #         'smo_intensity'] and item['duration'] == item['duration'] and item['quit_time'] == item['quit_time']:
+    #         plco = PLCOm2012(age=item['age'], race=item['race'], education=item['education'],
+    #                          body_mass_index=item['bmi'], copd=item['copd'], phist=item['phist'], fhist=item['fhist'],
+    #                          smoking_status=item['smo_status'], smoking_intensity=item['smo_intensity'],
+    #                          duration=item['duration'], quit_time=item['quit_time'])
+    #         plco_list.append(plco)
+    #     else:
+    #         plco_list.append('')
+    # df['plco'] = plco_list
 
     return df
 
 def get_PLCOm2012_score(file_list):
     df = _get_PLCOm2012_score_csv()
+    df = df.replace(np.nan, '', regex=True)
 
     # df.set_index('sess')
     index_list = df.index.to_list()
@@ -77,8 +79,13 @@ def get_PLCOm2012_score(file_list):
     file_list_without_ext = [file_name.replace('.nii.gz', '') for file_name in file_list]
 
     # Check if missing sess
-    missing_list = [sess for sess in file_list_without_ext if (sess not in data_dict) or (data_dict[sess]['plco'] == '')]
-    logger.info(f'Number of missing PLCOm2012: {len(missing_list)}')
+    missing_list_sess = [sess for sess in file_list_without_ext if sess not in data_dict]
+    logger.info(f'Number of missing of sessions: {len(missing_list_sess)}')
+    print(missing_list_sess)
+    missing_list_plco = [sess for sess in file_list_without_ext if (sess not in missing_list_sess) and (data_dict[sess]['plco'] == '')]
+    logger.info(f'Number of missing of PLCOm: {len(missing_list_plco)}')
+    missing_list = list(set(missing_list_sess + missing_list_plco))
+    logger.info(f'Total number of missing: {len(missing_list)}')
 
     valid_idx_list = [idx for idx, sess in enumerate(file_list_without_ext) if sess not in missing_list]
 

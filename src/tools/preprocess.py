@@ -185,8 +185,8 @@ class ScanFolderFlatReader(AbstractParallelRoutine):
 
 
 class ScanFolderBatchReader(AbstractParallelRoutine):
-    def __init__(self, config, in_folder, ref_img, batch_size, file_list_txt=None):
-        super().__init__(config, in_folder, file_list_txt)
+    def __init__(self, config, in_folder, ref_img, batch_size, file_list=None):
+        super().__init__(config, in_folder, file_list)
         self._ref_img = ScanWrapper(self._in_data_folder.get_file_path(0))
         self._chunk_list = self._in_data_folder.get_chunks_list_batch_size(batch_size)
         self._data_matrix = []
@@ -209,12 +209,20 @@ class ScanFolderBatchReader(AbstractParallelRoutine):
     def get_data_matrix(self):
         return self._data_matrix
 
+    def get_batch_idx_list(self, idx_batch):
+        return self._chunk_list[idx_batch]
+
     def save_flat_data(self, data_array, idx, out_folder):
         out_path_ori = os.path.join(out_folder, f'pc_{idx}.nii.gz')
         self._ref_img.save_scan_same_space(data_array, out_path_ori)
 
     def get_ref(self):
         return self._ref_img
+
+    def get_batch_file_name_list(self, idx_batch):
+        batch_idx_list = self._chunk_list[idx_batch]
+        file_name_list = [self._in_data_folder.get_file_path(file_idx) for file_idx in batch_idx_list]
+        return file_name_list
 
     def _run_single_scan(self, idx):
         in_file_path = self._in_data_folder.get_file_path(idx)
