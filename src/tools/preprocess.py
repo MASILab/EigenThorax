@@ -221,7 +221,7 @@ class ScanFolderBatchReader(AbstractParallelRoutine):
 
     def get_batch_file_name_list(self, idx_batch):
         batch_idx_list = self._chunk_list[idx_batch]
-        file_name_list = [self._in_data_folder.get_file_path(file_idx) for file_idx in batch_idx_list]
+        file_name_list = [self._in_data_folder.get_file_name(file_idx) for file_idx in batch_idx_list]
         return file_name_list
 
     def _run_single_scan(self, idx):

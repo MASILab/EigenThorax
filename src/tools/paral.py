@@ -10,7 +10,8 @@ class AbstractParallelRoutine:
     def __init__(self, config, in_folder, file_list=None):
         self._config = config
         self._in_data_folder = DataFolder(in_folder, file_list)
-        self._num_processes = config['num_processes']
+        # self._num_processes = config['num_processes']
+        self._num_processes = 1
 
     def run_parallel(self):
         pool = Pool(processes=self._num_processes)

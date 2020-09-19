@@ -14,7 +14,7 @@ class DataFolder:
     def __init__(self, in_folder, file_list=None):
         self._in_folder = in_folder
         self._file_list = []
-        if data_file_list is None:
+        if file_list is None:
             self._file_list = self._get_file_list_in_folder(in_folder)
         else:
             # self._file_list = self._get_file_list(data_file_list)

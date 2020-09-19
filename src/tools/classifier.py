@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
-from tools.preprocess import ScanFolderBatchWithMaskReader
+from tools.preprocess import ScanFolderBatchReader
 from tools.utils import get_logger
 from tools.cross_validation import get_idx_list_array_n_fold_cross_validation
 from sklearn import metrics
@@ -50,6 +50,15 @@ class MinibatchLinearClassifierWithCV:
 
         self.validation_result = []
 
+    def train_first_fold(self):
+        logger.info(f'Start to train model of fold 1')
+        self.model_list[0].train()
+
+    def valid_first_fold(self):
+        logger.info(f'Run validation with the first fold')
+        perf_statics = self.model_list[0].validate()
+        self.validation_result.append(perf_statics)
+
     def train(self):
         for idx_model in range(len(self.model_list)):
             logger.info(f'Start to train model of fold {idx_model}')
@@ -58,8 +67,8 @@ class MinibatchLinearClassifierWithCV:
     def validate(self):
         for idx_model in range(len(self.model_list)):
             logger.info(f'Start to validate model of fold {idx_model}')
-            validation_result = self.model_list[idx_model].validate()
-            self.validation_result.append(validation_result)
+            perf_statics = self.model_list[idx_model].validate()
+            self.validation_result.append(perf_statics)
 
     def show_cross_validation_result(self, out_folder):
         for idx_fold in range(len(self.validation_result)):
@@ -121,7 +130,7 @@ class MinibatchLinearClassifierWithCV:
 
 class MinibatchLinearClassifierSingleFold:
     def __init__(self, train_data_folder_obj, valid_data_folder_obj, label_dict):
-        self.num_epoch = 5
+        self.num_epoch = 1
         self.train_data_folder_obj = train_data_folder_obj
         self.valid_data_folder_obj = valid_data_folder_obj
         self.label_dict = label_dict
@@ -133,19 +142,21 @@ class MinibatchLinearClassifierSingleFold:
 
         self.model = SGDClassifier(n_jobs=-1, loss='log')
         for idx_epoch in range(self.num_epoch):
+            logger.info(f'Start epoch {idx_epoch}')
             for idx_batch in range(num_batch):
                 self.train_data_folder_obj.read_data(idx_batch)
                 data_matrix = self.train_data_folder_obj.get_data_matrix()
                 batch_file_name_list = self.train_data_folder_obj.get_batch_file_name_list(idx_batch)
                 batch_label = self.get_file_label_list(batch_file_name_list)
 
-                self.model.partial_fit(data_matrix, batch_label)
+                self.model.partial_fit(data_matrix, batch_label, classes=np.array([0, 1]))
 
     def validate(self):
         pred_prob_list = []
         true_label_list = []
         for idx_batch in range(self.valid_data_folder_obj.num_batch()):
-            data_X = self.valid_data_folder_obj.read_data(idx_batch)
+            self.valid_data_folder_obj.read_data(idx_batch)
+            data_X = self.valid_data_folder_obj.get_data_matrix()
             batch_pred_prob = self.model.predict_proba(data_X)
             pred_prob_list.append(batch_pred_prob)
 
@@ -153,8 +164,11 @@ class MinibatchLinearClassifierSingleFold:
             batch_label = self.get_file_label_list(batch_file_name_list)
             true_label_list.append(batch_label)
 
-        np.concatenate(tuple(pred_prob_list))
-        np.concatenate(tuple(true_label_list))
+        pred_prob_list = np.concatenate(tuple(pred_prob_list))
+        true_label_list = np.concatenate(tuple(true_label_list))
+        pred_prob_list = pred_prob_list[:, 1]
+        print(pred_prob_list.shape)
+        print(true_label_list.shape)
 
         validation_result = get_validation_statics(true_label_list, pred_prob_list)
 

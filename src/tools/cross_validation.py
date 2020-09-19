@@ -73,7 +73,7 @@ def get_idx_list_array_n_fold_cross_validation(file_name_list, label_list, num_f
             np.sum(np.array([scan_label[idx] for idx in scan_train_idx_list])))
         num_pos_scan_test_fold_array.append(
             np.sum(np.array([scan_label[idx] for idx in scan_test_idx_list])))
-        print([file_name_list[idx] for idx in scan_test_idx_list if scan_label[idx] == 1])
+        # print([file_name_list[idx] for idx in scan_test_idx_list if scan_label[idx] == 1])
         num_pos_subject_train_fold_array.append(
             np.sum(np.array([subject_label[idx] for idx in subject_train_idx_list])))
         num_pos_subject_test_fold_array.append(
