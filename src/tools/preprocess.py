@@ -214,7 +214,7 @@ class ScanFolderBatchReader(AbstractParallelRoutine):
 
     def save_flat_data(self, data_array, idx, out_folder):
         out_path_ori = os.path.join(out_folder, f'pc_{idx}.nii.gz')
-        self._ref_img.save_scan_same_space(data_array, out_path_ori)
+        self._ref_img.save_scan_flat_img(data_array, out_path_ori)
 
     def get_ref(self):
         return self._ref_img
